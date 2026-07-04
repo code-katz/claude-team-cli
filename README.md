@@ -33,7 +33,19 @@
 
 ---
 
-**What's New**
+**What's New — v0.7**
+
+**Session-scoped personas** — the `/akira`-style commands no longer touch global state, so parallel sessions each keep their own persona with no cross-talk. `claude-team use` still exists for pinning a global default and now says so out loud.
+
+**`claude-team launch <persona>`** — open a dedicated Claude Code session with the persona baked in as system prompt, on its tier model (Fable 5 for Akira and River, Opus 4.8 for the consulting personas, Sonnet 5 for implementation), optionally inside an isolated worktree: `claude-team launch akira --task "design the battles API" --worktree session/1-akira-battles`.
+
+**Delegation subagents** — twelve generated agents let any session hand work to a persona ("have Robin review this diff") without switching. Regenerate from profiles with `scripts/generate-agents.sh`.
+
+**Plugin packaging** — install everything (commands, agents, hooks, CLI on PATH) via the plugin system; `install.sh` remains for manual setups.
+
+**Worktree-isolated `/parallel`** — session plans create a git worktree per session and never switch branches; the coordination session merges in dependency order.
+
+**What's New — v0.6**
 
 **[Parallel sessions](#coordinator-proactive-team-check-ins)** — run independent work streams simultaneously, each with a dedicated team member, scoped task, and explicit file boundary. No merge conflicts. No context bleed.
 
@@ -350,7 +362,7 @@ curl -o ~/.claude/skills/todo/SKILL.md \
 curl -o ~/.claude/skills/publish/SKILL.md \
   https://raw.githubusercontent.com/code-katz/claude-publish-agent/main/SKILL.md
 curl -o ~/.claude/skills/conductor/SKILL.md \
-  https://raw.githubusercontent.com/code-katz/claude-conductor/main/SKILL.md
+  https://raw.githubusercontent.com/code-katz/claude-conductor/main/skills/conductor/SKILL.md
 ```
 
 ---

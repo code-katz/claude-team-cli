@@ -304,6 +304,13 @@ assert_file_has "session marker has started_at"        "$SESSION_WT/.claude-sess
 
 # session start registers branch in INDEX.md
 assert_file_has "session start writes INDEX.md entry"  "$SESSION_INDEX" "feat/session-test"
+
+# .claude-session must never be committable (worktree-local exclude)
+if git -C "$SESSION_WT" status --porcelain 2>/dev/null | grep -q '.claude-session'; then
+  fail "session marker is git-ignored in the worktree"
+else
+  ok "session marker is git-ignored in the worktree"
+fi
 assert_file_has "session start writes active status"   "$SESSION_INDEX" "active"
 
 # session start blocked if branch already active

@@ -5,6 +5,40 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-04] v0.7: Session-scoped personas, launcher with model tiers, plugin packaging
+
+**Category:** `milestone`
+**Tags:** `personas`, `launch`, `worktrees`, `plugin`, `subagents`, `fable-5`, `v0.7`
+**Risk Level:** `medium`
+**Breaking Change:** `behavioral` (persona slash commands no longer write ~/.claude/CLAUDE.md)
+
+### Summary
+
+Modernization against the July 2026 Claude Code harness. Personas are now session-scoped with three surfaces (slash commands, launcher, delegation subagents), /parallel creates a worktree per session instead of switching branches in a shared checkout, and the repo installs as a plugin.
+
+### Detail
+
+- Persona slash commands no longer run claude-team use, ending the race where parallel sessions overwrote each other's persona in the global CLAUDE.md. Each command gained frontmatter. claude-team use survives as a global pin with an explicit warning.
+- claude-team launch <persona> [--task] [--worktree <branch>] [--model] [--dry-run]: dedicated sessions via --append-system-prompt-file, model from profiles/tiers.conf (Fable 5: Akira, River; Opus 4.8: Morgan, Sage, Jordan, Quinn, Toni, Casey, Kai; Sonnet 5: Sasha, Alex, Robin).
+- agents/: twelve delegation subagents generated from profiles by scripts/generate-agents.sh; profiles remain the single source of truth.
+- /parallel rewritten: coordination session creates one worktree per session via claude-team session start; prompts verify the worktree, rebase before done, and never contain git checkout; merges happen only in the coordination session in dependency order.
+- Worktree base branch detected (origin/HEAD, then main/master/trunk, then current) instead of hardcoded main; this also fixed 11 latent test failures on machines where git init creates master.
+- .claude-session markers are now excluded via the repo's common info/exclude: committed markers differed per session and produced add/add merge conflicts between session branches (found by claude-conductor's end-to-end drill).
+- SessionStart hook (hooks/hooks.json + bin/team-session-start) injects worktree, branch, and roster context deterministically. Plugin manifest ships commands, agents, hooks, and the CLI on PATH; install.sh remains for manual setups and now also installs tiers.conf and agents.
+- Coordinators: retired TodoWrite reference replaced with current task tools; permission modes updated; switching guidance leads with session-scoped /name commands. Tests: 98 (was 82).
+
+### Decisions Made
+
+- **Session-scoped by construction over global state:** the launcher injects personas as appended system prompt, so isolation needs no coordination and survives compaction.
+- **Common info/exclude over committed .gitignore:** the marker is tool-local state; ignoring it repo-locally avoids polluting user gitignores while covering every worktree.
+- **Commands stay commands:** commands and skills are the same mechanism in the current harness; generating a parallel skills/ tree would double-register every /name.
+
+### Related
+
+- code-katz/claude-conductor v1.1 (companion changes, drill that caught the marker bug)
+
+---
+
 ## [2026-04-09] Casual/prod coordinator modes + README and roadmap overhaul
 
 **Category:** `milestone`
