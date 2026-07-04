@@ -703,6 +703,21 @@ Run: claude-team session status"
     "$project" "$branch_name" "$worktree_path" "$plan_slug" "$started_at" \
     > "$worktree_path/.claude-session"
 
+  # The marker is local state and must never enter history: each session's
+  # marker differs, so committed markers produce add/add merge conflicts
+  # between session branches. Git reads info/exclude from the COMMON git
+  # dir (per-worktree info/exclude is ignored), and the common exclude is
+  # repo-local, uncommitted, and covers every worktree at once.
+  local common_git_dir
+  common_git_dir=$(cd "$worktree_path" && git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    || common_git_dir=$(cd "$repo_root" && git rev-parse --git-common-dir 2>/dev/null) || common_git_dir=""
+  if [[ -n "$common_git_dir" && -d "$common_git_dir" ]]; then
+    mkdir -p "$common_git_dir/info"
+    if ! grep -qx '.claude-session' "$common_git_dir/info/exclude" 2>/dev/null; then
+      echo ".claude-session" >> "$common_git_dir/info/exclude"
+    fi
+  fi
+
   # Register in INDEX.md
   ensure_branches_index
   local today
