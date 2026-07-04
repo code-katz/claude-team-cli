@@ -578,6 +578,78 @@ read_session_marker() {
   fi
 }
 
+# ─── Launch (dedicated persona session) ──────────────────────────────────────
+
+TIERS_FILE="$PROFILES_DIR/tiers.conf"
+
+get_default_model() {
+  local name="$1"
+  [[ -f "$TIERS_FILE" ]] || { echo ""; return; }
+  awk -v p="$name" '$1 == p { print $2; exit }' "$TIERS_FILE"
+}
+
+cmd_launch() {
+  [[ $# -ge 1 ]] || die "Usage: claude-team launch <persona> [--task \"...\"] [--worktree <branch>] [--model <model>] [--dry-run]"
+  local name profile
+  name=$(lowercase "$1")
+  shift
+  profile=$(resolve_name "$name")
+
+  local model task="" branch="" dry_run=false
+  model=$(get_default_model "$name")
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --model)    [[ $# -ge 2 ]] || die "--model requires a value"; model="$2"; shift 2 ;;
+      --task)     [[ $# -ge 2 ]] || die "--task requires a value"; task="$2"; shift 2 ;;
+      --worktree) [[ $# -ge 2 ]] || die "--worktree requires a branch name"; branch="$2"; shift 2 ;;
+      --dry-run)  dry_run=true; shift ;;
+      *) die "Unknown option: $1" ;;
+    esac
+  done
+
+  local name_cap workdir="$PWD"
+  name_cap=$(capitalize "$name")
+
+  if [[ -n "$branch" ]]; then
+    local repo_root project
+    repo_root=$(git rev-parse --show-toplevel 2>/dev/null) \
+      || die "--worktree requires running inside a git repo."
+    project=$(basename "$repo_root")
+    workdir=$(get_worktree_path "$project" "$branch")
+    if [[ ! -d "$workdir" ]]; then
+      if [[ "$dry_run" == true ]]; then
+        echo "$(dim "[dry-run] would create worktree: claude-team session start $branch")"
+      else
+        cmd_session_start "$branch"
+      fi
+    fi
+  fi
+
+  # The persona rides in as an appended system prompt: session-scoped by
+  # construction, survives compaction, and no global state is touched.
+  local cmd=(claude --append-system-prompt-file "$profile" -n "$name_cap")
+  [[ -n "$model" ]] && cmd+=(--model "$model")
+  [[ -n "$task" ]] && cmd+=("$task")
+
+  if [[ "$dry_run" == true ]]; then
+    echo ""
+    echo "$(bold "Launch plan for $name_cap")"
+    echo "  Directory: $workdir"
+    printf '  Command:  '
+    printf ' %q' "${cmd[@]}"
+    printf '\n\n'
+    return
+  fi
+
+  command -v claude >/dev/null 2>&1 \
+    || die "The 'claude' CLI is not on PATH. Install Claude Code first."
+
+  echo ""
+  echo "$(green "✓") Launching $(bold "$name_cap")${model:+ on $(bold "$model")} in $workdir"
+  echo ""
+  cd "$workdir" && exec "${cmd[@]}"
+}
+
 # ─── Session commands ──────────────────────────────────────────────────────────
 
 cmd_session_start() {
@@ -776,6 +848,14 @@ cmd_help() {
   echo "  claude-team coordinator off         Disable coordinator"
   echo "  claude-team install-commands        Install slash commands to ~/.claude/commands/"
   echo ""
+  echo "$(bold "Dedicated persona sessions:")"
+  echo "  claude-team launch <persona>        Open a Claude Code session with the persona baked in"
+  echo "  claude-team launch <persona> --task \"...\"          Start with an initial prompt"
+  echo "  claude-team launch <persona> --worktree <branch>   Launch inside an isolated worktree"
+  echo "  claude-team launch <persona> --model <model>       Override the persona's tier default"
+  echo "  claude-team launch <persona> --dry-run             Print the launch command, don't run"
+  echo "                                     $(dim "Tier defaults: profiles/tiers.conf (Fable/Opus/Sonnet)")"
+  echo ""
   echo "$(bold "Parallel sessions (worktrees):")"
   echo "  claude-team session start <name>   Create a worktree + branch for an isolated session"
   echo "  claude-team session start <name> --plan <slug>"
@@ -828,6 +908,7 @@ case "${1:-help}" in
   status)           cmd_status ;;
   coordinator)      cmd_coordinator "${2:-}" ;;
   install-commands) cmd_install_commands ;;
+  launch)           shift; cmd_launch "$@" ;;
   branch)           shift; cmd_branch "$@" ;;
   session)          shift; cmd_session "$@" ;;
   help|--help|-h)   cmd_help ;;

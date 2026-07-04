@@ -331,6 +331,65 @@ assert_file_has "session start --plan writes slug to marker" "$SESSION_WT2/.clau
 rm -rf "$SESSION_REPO"
 echo ""
 
+# launch + plugin surfaces
+echo "launch + plugin surfaces"
+
+out=$(run_cmd launch akira --dry-run 2>&1)
+assert_contains "launch akira defaults to fable tier" "claude-fable-5" "$out"
+assert_contains "launch dry-run shows append-system-prompt-file" "append-system-prompt-file" "$out"
+
+out=$(run_cmd launch robin --dry-run 2>&1)
+assert_contains "launch robin defaults to sonnet tier" "claude-sonnet-5" "$out"
+
+out=$(run_cmd launch sage --dry-run 2>&1)
+assert_contains "launch sage defaults to opus tier" "claude-opus-4-8" "$out"
+
+out=$(run_cmd launch akira --model claude-haiku-4-5 --dry-run 2>&1)
+assert_contains "launch --model overrides tier default" "claude-haiku-4-5" "$out"
+
+out=$(run_cmd launch akira --task "review the auth flow" --dry-run 2>&1)
+assert_contains "launch --task appends initial prompt" "review.*auth.*flow" "$out"
+
+out=$(run_cmd launch nobody --dry-run 2>&1) || true
+assert_contains "launch unknown persona errors" "No profile found" "$out"
+
+if command -v python3 >/dev/null 2>&1; then
+  if python3 -c "import json; json.load(open('$REPO_DIR/.claude-plugin/plugin.json'))" 2>/dev/null; then
+    ok "plugin.json is valid JSON"
+  else
+    fail "plugin.json is valid JSON"
+  fi
+  if python3 -c "import json; d=json.load(open('$REPO_DIR/hooks/hooks.json')); assert 'SessionStart' in d['hooks']" 2>/dev/null; then
+    ok "hooks.json is valid and registers SessionStart"
+  else
+    fail "hooks.json is valid and registers SessionStart"
+  fi
+fi
+
+agent_count=$(ls "$REPO_DIR/agents"/*.md 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$agent_count" == "12" ]]; then ok "12 persona subagents generated"; else fail "12 persona subagents generated (got $agent_count)"; fi
+assert_contains "akira agent carries model tier" "model: claude-fable-5" "$(cat "$REPO_DIR/agents/akira.md")"
+assert_contains "agents marked as generated" "GENERATED from profiles" "$(cat "$REPO_DIR/agents/robin.md")"
+
+# team-session-start hook behavior
+HOOK="$REPO_DIR/bin/team-session-start"
+NOGIT_DIR=$(mktemp -d)
+out=$(printf '{"session_id":"t1","cwd":"%s"}' "$NOGIT_DIR" | HOME="$TEST_HOME" "$HOOK")
+if [[ -z "$out" ]]; then ok "session-start hook silent outside git repo"; else fail "session-start hook silent outside git repo"; fi
+rm -rf "$NOGIT_DIR"
+
+HOOK_REPO=$(mktemp -d)
+git init -q "$HOOK_REPO" 2>/dev/null
+out=$(printf '{"session_id":"t2","cwd":"%s"}' "$HOOK_REPO" | HOME="$TEST_HOME" "$HOOK")
+assert_contains "session-start hook emits project context in repo" "Claude Team session context" "$out"
+
+printf 'project=demo\nbranch=feat/hooked\n' > "$HOOK_REPO/.claude-session"
+out=$(printf '{"session_id":"t3","cwd":"%s"}' "$HOOK_REPO" | HOME="$TEST_HOME" "$HOOK")
+assert_contains "session-start hook detects worktree session" "feat/hooked" "$out"
+rm -rf "$HOOK_REPO"
+
+echo ""
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo "────────────────────────────────"

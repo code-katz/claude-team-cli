@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# team-session-start — Claude Code SessionStart hook.
+#
+# Deterministically injects the context the coordinator profile used to
+# reconstruct by instruction-following: worktree session details, the
+# registered active branch, and the team roster pointer. Stdout from a
+# SessionStart hook is added to the session's context.
+#
+# Fast and read-only: file reads and one git call, no network, no writes.
+# Always exits 0.
+
+set -uo pipefail
+
+input=$(cat 2>/dev/null) || input=""
+cwd=""
+if command -v jq >/dev/null 2>&1 && [[ -n "$input" ]]; then
+  cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
+fi
+dir="${cwd:-${CLAUDE_PROJECT_DIR:-$PWD}}"
+
+root=$(cd "$dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || root=""
+[[ -n "$root" ]] || exit 0
+
+INDEX="$HOME/.claude/branches/INDEX.md"
+
+if [[ -f "$root/.claude-session" ]]; then
+  # Worktree session: branch isolation is automatic; surface the contract.
+  branch=$(grep '^branch=' "$root/.claude-session" | cut -d= -f2)
+  project=$(grep '^project=' "$root/.claude-session" | cut -d= -f2)
+  echo "Claude Team session context: this is an isolated WORKTREE session for project '${project}' on branch '${branch}'. All work stays on this branch. Never run git checkout, git switch, or git merge here; the coordination session merges. Check status anytime with 'claude-team session status'."
+else
+  project=$(basename "$root")
+  active=""
+  if [[ -f "$INDEX" ]]; then
+    active=$(awk -F'|' -v proj="$project" \
+      '$3 ~ " " proj " " && $6 ~ / active / { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $4); print $4; exit }' \
+      "$INDEX")
+  fi
+  if [[ -n "$active" ]]; then
+    echo "Claude Team session context: project '${project}' has registered active branch '${active}' (from ~/.claude/branches/INDEX.md). All work this session goes on that branch."
+  else
+    echo "Claude Team session context: project '${project}'. No branch is registered in ~/.claude/branches/INDEX.md. If the coordinator is in prod mode, register one before writing code: claude-team branch start feat/<name>. Personas available via /akira, /sasha, /robin, etc. (claude-team list for all)."
+  fi
+fi
+
+exit 0
