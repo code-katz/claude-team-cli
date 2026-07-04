@@ -1,6 +1,12 @@
+---
+description: Generate a parallel session plan with worktree isolation, one persona per session, and conductor tracking
+---
+
 Generate a parallel session plan for the current work.
 
 You are acting as a session planner. Analyze the current conversation context, any active plan, and the user's stated goals to identify independent work streams that can run in parallel Claude Code sessions.
+
+The session you are in now becomes the coordination session. Its checkout stays on the default branch at all times. Every parallel session runs in its own git worktree, so no session ever switches branches.
 
 ---
 
@@ -23,77 +29,76 @@ claude-conductor add --persona [Name] --task "[task description]" --files "[file
 
 Run one `add` command per session. This creates the SESSIONS.md entries and plan checklist automatically. A branch name is auto-generated from the session number, persona, and task slug (e.g., `session/1-akira-implement-battle-api`). Use `--branch` to override.
 
-5. **Present the plan.** Output numbered session prompts in this format. Each prompt must start with an explicit instruction to run the conductor status command FIRST, before any other work. This is critical: sessions will not self-update unless the tracking command is the first action in the prompt, not a suggestion or quote block.
+5. **Create one worktree per session.** From this coordination session, run one command per session, using the exact branch name registered in step 4:
+
+```bash
+claude-team session start session/1-[persona]-[task-slug]
+claude-team session start session/2-[persona]-[task-slug]
+```
+
+Each command creates an isolated git worktree with the session's branch checked out and prints the worktree path. Record each path; it goes into the session prompt. Never instruct a session to run `git checkout` or `git switch`. The worktree IS the branch isolation.
+
+6. **Present the plan.** Output numbered session prompts in this format. The user opens a new Claude Code session inside each worktree directory. Each prompt must start with the verification and tracking commands, before any other work.
 
 ```
 ## Parallel Session Plan
 
 ### Session 1: [domain label]
 **Persona:** /[name]
+**Worktree:** [path printed by session start] — open Claude Code in this directory
 **Task:** [specific, scoped instruction]
 **Files:** [explicit file/directory list]
 
 **IMPORTANT: Before doing anything else, run these commands:**
 ```bash
-git checkout -b session/1-[persona]-[task-slug] || git checkout session/1-[persona]-[task-slug]
+claude-team session status
 claude-conductor u 1 coding --activity "starting work"
 ```
+If `session status` does not show branch `session/1-[persona]-[task-slug]`, STOP and tell the user to reopen this session in the worktree path above.
+
 When you are completely done:
 1. Commit all changes: `git add [files] && git commit -m "[persona]: [brief summary]"`
-2. Mark session done: `claude-conductor d 1`
+2. Sync with the default branch: `git fetch origin && git rebase origin/[default-branch]` (no remote? rebase onto the local default branch instead)
+3. Mark session done: `claude-conductor d 1`
+4. Do NOT merge and do NOT switch branches. The coordination session merges in dependency order.
 
 ### Session 2: [domain label]
-**Persona:** /[name]
-**Task:** [specific, scoped instruction]
-**Files:** [explicit file/directory list]
-
-**IMPORTANT: Before doing anything else, run these commands:**
-```bash
-git checkout -b session/2-[persona]-[task-slug] || git checkout session/2-[persona]-[task-slug]
-claude-conductor u 2 coding --activity "starting work"
-```
-When you are completely done:
-1. Commit all changes: `git add [files] && git commit -m "[persona]: [brief summary]"`
-2. Mark session done: `claude-conductor d 2`
+[same structure]
 
 ### Session 3: [domain label] (if applicable)
-**Persona:** /[name]
-**Task:** [specific, scoped instruction]
-**Files:** [explicit file/directory list]
-
-**IMPORTANT: Before doing anything else, run these commands:**
-```bash
-git checkout -b session/3-[persona]-[task-slug] || git checkout session/3-[persona]-[task-slug]
-claude-conductor u 3 coding --activity "starting work"
-```
-When you are completely done:
-1. Commit all changes: `git add [files] && git commit -m "[persona]: [brief summary]"`
-2. Mark session done: `claude-conductor d 3`
+[same structure]
 
 **Merge order:** [order with reasoning, or "No merge order required; all sessions are independent."]
-**Merge commands for coordination session:**
+
+**Merge commands for the coordination session** (this checkout is already on the default branch; no checkout needed):
 ```bash
-git checkout main
-git merge session/1-[persona]-[slug]
-git merge session/2-[persona]-[slug]
-# Add session/3 if applicable
+git merge session/1-[persona]-[slug]      # then: claude-conductor m 1
+git merge session/2-[persona]-[slug]      # then: claude-conductor m 2
+# Add session/3 if applicable, respecting the merge order above.
+
+# Cleanup after all sessions are merged:
+claude-team session list                  # shows each worktree path
+git worktree remove [worktree-path]       # one per session
 git branch -d session/1-[persona]-[slug] session/2-[persona]-[slug]
 ```
+
 **Coordination session:** Keep this session open for questions, reviewing work, and merging branches.
 ```
 
-6. **Suggest opening the dashboard.** After registering sessions, tell the user:
+7. **Suggest opening the dashboard.** After registering sessions, tell the user:
    "Run `claude-conductor dash --open` to open the live dashboard in your browser."
 
 ## Rules
 
 - Maximum 3 parallel sessions
 - File scopes must not overlap between sessions
-- Every prompt must include persona, task, file scope, and conductor tracking instructions
+- Every session gets its own worktree via `claude-team session start`; never put `git checkout`, `git switch`, or `git merge` in a session prompt
+- The branch registered with `claude-conductor add` must exactly match the branch passed to `claude-team session start`
+- Every prompt must include persona, task, file scope, worktree path, and conductor tracking instructions
+- Completion instructions must include committing all work and rebasing onto the default branch before marking done
+- Merging happens only in the coordination session, in dependency order
 - If the work cannot be meaningfully parallelized, say so: "This task is too intertwined to split. Better to run it as a single session."
 - Do not generate vague or open-ended prompts; each task should be specific enough that the session can complete it without asking clarifying questions
 - Always register sessions with `claude-conductor add` before presenting the prompts
 - If SESSIONS.md does not exist, run `claude-conductor init` first
-- Every session prompt must include a `git checkout -b` command matching the branch registered with conductor
-- Completion instructions must include committing all work before marking done
-- Use `git checkout -b <branch> || git checkout <branch>` to handle session re-entry
+- Session re-entry: the worktree persists until removed, so reopening the worktree directory resumes the session's branch automatically

@@ -103,7 +103,7 @@ Common shift signals:
 - Business formation, entity structure, expenses, contracts, pricing models, or fundraising → suggest Sage
 - UI discussion needing mockups, wireframes, visual design, or image generation → suggest Kai
 
-Format: "We're moving into [domain] territory — want to switch to [Name]? You can run `claude-team use [name]` in your terminal and start a new session."
+Format: "We're moving into [domain] territory — want to switch to [Name]? Run `/[name]` right here to switch for this session, no restart needed."
 
 When suggesting a handoff, also prompt the active team member to produce a **Handoff Brief** before switching: a 3-part summary of (1) decisions made this session, (2) unresolved risks or open questions, and (3) a direct question addressed to the incoming team member by name. Example: *"To Sasha: We finalized the API contract, but loading states for partial responses are undefined — how do you want to handle that in the UI?"*
 
@@ -130,7 +130,7 @@ If no linter is configured, flag it to the user before proceeding with any code 
 
 ## Session Workflow Checklist
 
-For any non-trivial session, use the TodoWrite tool to create a simple checklist:
+For any non-trivial session, track a simple checklist with Claude Code's built-in task list (the TaskCreate and TaskUpdate tools):
 
 ```
 [ ] Plan approved (or confirmed not needed for small fix)
@@ -146,7 +146,7 @@ For substantial sessions, write a brief devlog entry using the `/devlog` skill. 
 
 ## Mode Selection
 
-Claude Code has three operating modes. Before starting any substantial task, always present all three and recommend the right one for the situation. Do not assume — always confirm.
+Claude Code's three everyday permission modes are plan mode, ask before edits (the default), and edit automatically (acceptEdits). Additional modes exist (auto, dontAsk, bypassPermissions); recommend those only when the user explicitly asks for them. Before starting any substantial task, always present all three and recommend the right one for the situation. Do not assume — always confirm.
 
 ### The three modes
 
@@ -187,8 +187,8 @@ State your recommendation and reasoning first, then list all three options:
 ## Switching Reminders
 
 When suggesting a team member switch, always include:
-1. The CLI command to run: `claude-team use <name>`
-2. A reminder that the switch takes effect in the next Claude Code session
+1. The slash command to run in this session: `/<name>` (session-scoped, takes effect immediately)
+2. A note that `claude-team use <name>` instead pins the persona globally for future sessions; avoid it while parallel sessions with different personas are running
 3. How to check current status: `claude-team status`
 
 ## Parallel Sessions
