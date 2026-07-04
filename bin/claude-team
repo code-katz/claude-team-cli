@@ -137,6 +137,10 @@ cmd_use() {
   echo "$(green "✓") $(bold "$display_name") is now active."
   echo "$(dim "Start a new Claude Code session to apply the profile.")"
   echo ""
+  echo "$(dim "Note: 'use' pins this persona globally (~/.claude/CLAUDE.md) for ALL new sessions.")"
+  echo "$(dim "Running parallel sessions with different personas? Use the /akira-style slash")"
+  echo "$(dim "commands inside each session instead — they are session-scoped.")"
+  echo ""
 }
 
 cmd_reset() {
@@ -538,6 +542,22 @@ ensure_worktrees_root() {
   mkdir -p "$WORKTREES_ROOT"
 }
 
+get_default_branch() {
+  local repo="$1" ref name
+  # Prefer the remote's HEAD, then common local names, then the current branch
+  if ref=$(git -C "$repo" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null); then
+    echo "${ref#origin/}"
+    return
+  fi
+  for name in main master trunk; do
+    if git -C "$repo" show-ref --quiet "refs/heads/$name"; then
+      echo "$name"
+      return
+    fi
+  done
+  git -C "$repo" symbolic-ref --short HEAD 2>/dev/null || echo "main"
+}
+
 sanitize_branch_for_path() {
   echo "$1" | tr '/' '-'
 }
@@ -593,13 +613,15 @@ Run: claude-team session status"
   ensure_worktrees_root
   mkdir -p "$(dirname "$worktree_path")"
 
-  # Create worktree: track existing local branch, or create new one from main
+  # Create worktree: track existing local branch, or create new one from the default branch
   if git -C "$repo_root" show-ref --quiet "refs/heads/$branch_name"; then
     git -C "$repo_root" worktree add "$worktree_path" "$branch_name" \
       || die "Failed to create worktree for existing branch '$branch_name'"
   else
-    git -C "$repo_root" worktree add -b "$branch_name" "$worktree_path" main \
-      || die "Failed to create worktree and branch '$branch_name'"
+    local base_branch
+    base_branch=$(get_default_branch "$repo_root")
+    git -C "$repo_root" worktree add -b "$branch_name" "$worktree_path" "$base_branch" \
+      || die "Failed to create worktree and branch '$branch_name' from '$base_branch'"
   fi
 
   # Write .claude-session marker inside the worktree
