@@ -30,15 +30,27 @@ echo "$(bold "claude-team-cli installer")"
 echo "────────────────────────────────────"
 echo ""
 
-# 1. Install profiles
+# 1. Install profiles (+ model tiers)
 echo "Installing profiles to $PROFILES_DST ..."
 mkdir -p "$PROFILES_DST"
 cp "$PROFILES_SRC"/*.md "$PROFILES_DST/"
+if [[ -f "$PROFILES_SRC/tiers.conf" ]]; then cp "$PROFILES_SRC/tiers.conf" "$PROFILES_DST/"; fi
 echo "$(green "✓") Profiles installed:"
 for f in "$PROFILES_DST"/*.md; do
   echo "    $(dim "$f")"
 done
 echo ""
+
+# 1b. Install delegation subagents
+AGENTS_SRC="$REPO_DIR/agents"
+AGENTS_DST="$HOME/.claude/agents"
+if [[ -d "$AGENTS_SRC" ]]; then
+  echo "Installing persona subagents to $AGENTS_DST ..."
+  mkdir -p "$AGENTS_DST"
+  cp "$AGENTS_SRC"/*.md "$AGENTS_DST/"
+  echo "$(green "✓") Subagents installed (delegate with, e.g., \"have robin review this diff\")"
+  echo ""
+fi
 
 # 2. Install slash commands
 echo "Installing slash commands to $COMMANDS_DST ..."
