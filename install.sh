@@ -112,40 +112,18 @@ printf "  Enable the coordinator now? [casual/prod/n] (default: casual) "
 read -r coord_answer
 coord_answer="${coord_answer:-casual}"
 
-CLAUDE_MD="$HOME/.claude/CLAUDE.md"
-COORD_START="<!-- CLAUDE-COORDINATOR:START -->"
-COORD_END="<!-- CLAUDE-COORDINATOR:END -->"
-
-_install_coord() {
-  local coord_file="$1"
-  local label="$2"
-  local content
-  content=$(cat "$coord_file")
-  local block
-  block=$(printf '%s\n%s\n%s' "$COORD_START" "$content" "$COORD_END")
-  if grep -qF "$COORD_START" "$CLAUDE_MD"; then
-    local tmp
-    tmp=$(mktemp)
-    awk "/$COORD_START/{exit} {print}" "$CLAUDE_MD" > "$tmp"
-    printf '%s\n%s\n%s\n' "$COORD_START" "$content" "$COORD_END" >> "$tmp"
-    awk "/$COORD_END/{found=1; next} found{print}" "$CLAUDE_MD" >> "$tmp"
-    mv "$tmp" "$CLAUDE_MD"
-  else
-    printf '\n%s\n' "$block" >> "$CLAUDE_MD"
-  fi
-  echo "  $(green "✓") Coordinator enabled ($label mode)."
-}
-
-touch "$CLAUDE_MD"
+# Delegate to the CLI just installed: it owns the marker-block editing
+# (atomic replace-or-append), so the logic lives in exactly one place and
+# this path is the same one the test suite exercises.
 case "$(echo "$coord_answer" | tr '[:upper:]' '[:lower:]')" in
   prod)
-    _install_coord "$PROFILES_DST/coordinator-prod.md" "prod"
+    "$BIN_SRC" coordinator prod
     ;;
   n|no)
     echo "  $(dim "Skipped. Enable later with: claude-team coordinator on")"
     ;;
   *)
-    _install_coord "$PROFILES_DST/coordinator.md" "casual"
+    "$BIN_SRC" coordinator on
     ;;
 esac
 

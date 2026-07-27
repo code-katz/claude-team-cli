@@ -34,15 +34,17 @@ run_cmd() {
 ok()   { PASS=$((PASS + 1)); printf "  \033[32m✓\033[0m %s\n" "$1"; }
 fail() { FAIL=$((FAIL + 1)); ERRORS+=("$1"); printf "  \033[31m✗\033[0m %s\n" "$1"; }
 
+# Patterns are POSIX EREs (grep -E): alternation is plain '|', and BRE-only
+# GNU extensions like '\|' must not be used (BSD grep rejects them).
 assert_contains() {
   local name="$1" pattern="$2" output="$3"
-  if echo "$output" | grep -q "$pattern"; then ok "$name"
+  if grep -Eq "$pattern" <<< "$output"; then ok "$name"
   else fail "$name (expected: '$pattern')"; fi
 }
 
 assert_not_contains() {
   local name="$1" pattern="$2" output="$3"
-  if ! echo "$output" | grep -q "$pattern"; then ok "$name"
+  if ! grep -Eq "$pattern" <<< "$output"; then ok "$name"
   else fail "$name (must not contain: '$pattern')"; fi
 }
 
@@ -217,6 +219,72 @@ assert_exits_nonzero "use without name exits nonzero" "$CLI" use
 assert_exits_nonzero "show without name exits nonzero" "$CLI" show
 echo ""
 
+# content preservation: use/reset and coordinator on/off must round-trip the
+# user's own CLAUDE.md byte-for-byte (leading blanks and trailing spaces
+# included), and must not leave a stray trailing blank line behind.
+echo "content preservation on block removal"
+
+FIXTURE="$TEST_HOME/claude-md-fixture"
+printf '\n# My Notes\n\nline with trailing spaces  \nlast line\n' > "$FIXTURE"
+
+cp "$FIXTURE" "$CLAUDE_MD"
+run_cmd use robin >/dev/null
+run_cmd reset >/dev/null
+if cmp -s "$CLAUDE_MD" "$FIXTURE"; then ok "use + reset round-trips user content byte-for-byte"
+else fail "use + reset round-trips user content byte-for-byte"; fi
+
+cp "$FIXTURE" "$CLAUDE_MD"
+run_cmd coordinator on >/dev/null
+run_cmd coordinator off >/dev/null
+if cmp -s "$CLAUDE_MD" "$FIXTURE"; then ok "coordinator on + off round-trips user content byte-for-byte"
+else fail "coordinator on + off round-trips user content byte-for-byte"; fi
+echo ""
+
+# branch index lookups must treat project and branch names as literal strings,
+# not regexes: dots must not cross-match similarly named projects, and regex
+# metacharacters like parentheses must not crash the lookup.
+echo "branch index metachar regression"
+
+META_BASE=$(mktemp -d)
+mkdir -p "$META_BASE/my.app" "$META_BASE/myXapp" "$META_BASE/app(1)"
+git init -q "$META_BASE/my.app" 2>/dev/null
+git init -q "$META_BASE/myXapp" 2>/dev/null
+git init -q "$META_BASE/app(1)" 2>/dev/null
+
+(cd "$META_BASE/myXapp" && run_cmd branch start release/9.9.9 >/dev/null)
+out=$(cd "$META_BASE/my.app" && run_cmd branch status 2>&1)
+assert_contains     "dotted project does not cross-match similar project" "none|No branch|no active|No active" "$out"
+assert_not_contains "dotted project does not see other project's branch"  "release/9\.9\.9" "$out"
+
+(cd "$META_BASE/my.app" && run_cmd branch start release/1.2.3 >/dev/null)
+out=$(cd "$META_BASE/my.app" && run_cmd branch status)
+assert_contains "dotted branch name registers and resolves" "release/1\.2\.3" "$out"
+
+if (cd "$META_BASE/app(1)" && run_cmd branch start feat/x >/dev/null 2>&1); then
+  ok "paren project name does not crash branch start"
+else
+  fail "paren project name does not crash branch start"
+fi
+out=$(cd "$META_BASE/app(1)" && run_cmd branch status 2>&1)
+assert_contains "paren project name resolves its branch" "feat/x" "$out"
+
+(cd "$META_BASE/my.app"  && run_cmd branch "done" >/dev/null 2>&1)
+(cd "$META_BASE/myXapp"  && run_cmd branch "done" >/dev/null 2>&1)
+(cd "$META_BASE/app(1)"  && run_cmd branch abandon >/dev/null 2>&1)
+rm -rf "$META_BASE"
+echo ""
+
+# title parsing: "Name — Role" splits at the FIRST em dash, so a role may
+# itself contain one without being truncated.
+echo "title parsing"
+TITLE_DIR=$(mktemp -d)
+cp "$PROFILES_DIR/robin.md" "$TITLE_DIR/robin.md"
+printf '# Testy — Role One — Extended\n\nBody.\n' > "$TITLE_DIR/testy.md"
+out=$(CLAUDE_TEAM_PROFILES="$TITLE_DIR" HOME="$TEST_HOME" "$CLI" list)
+assert_contains "multi-dash title keeps the full role" "Role One — Extended" "$out"
+rm -rf "$TITLE_DIR"
+echo ""
+
 # branch commands
 echo "branch commands"
 
@@ -224,7 +292,7 @@ BRANCHES_INDEX="$TEST_HOME/.claude/branches/INDEX.md"
 
 # status warns when no index exists
 out=$(run_cmd branch status 2>&1)
-assert_contains "branch status warns when no active branch" "none\|No branch\|no active\|No active" "$out"
+assert_contains "branch status warns when no active branch" "none|No branch|no active|No active" "$out"
 
 # start registers a branch
 run_cmd branch start feat/test-branch >/dev/null
@@ -241,13 +309,13 @@ assert_contains "branch status shows active branch"     "feat/test-branch" "$out
 assert_exits_nonzero "branch start blocked when active exists" "$CLI" branch start feat/duplicate
 
 # done marks merged
-out=$(run_cmd branch done 2>&1)
+out=$(run_cmd branch "done" 2>&1)
 assert_contains "branch done output mentions merged"    "merged" "$out"
 assert_file_has "branch done updates status in index"   "$BRANCHES_INDEX" "merged"
 
 # status after done shows none
 out=$(run_cmd branch status 2>&1)
-assert_contains "branch status after done shows none"   "none\|No branch\|no active\|No active" "$out"
+assert_contains "branch status after done shows none"   "none|No branch|no active|No active" "$out"
 
 # start with --plan links a plan slug
 run_cmd branch start feat/with-plan --plan some-plan-slug >/dev/null
@@ -290,7 +358,7 @@ SESSION_INDEX="$TEST_HOME/.claude/branches/INDEX.md"
 
 # session status warns when no session marker
 out=$(cd "$SESSION_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session status 2>&1)
-assert_contains "session status warns when no session" "none\|No.*session\|not in\|Not in" "$out"
+assert_contains "session status warns when no session" "none|No.*session|not in|Not in" "$out"
 
 # session start creates worktree directory
 (cd "$SESSION_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/session-test >/dev/null 2>&1)
@@ -319,7 +387,7 @@ assert_file_has "session start writes active status"   "$SESSION_INDEX" "active"
 
 # session start blocked if branch already active
 out=$(cd "$SESSION_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/session-test 2>&1)
-assert_contains "session start blocked if already active" "already\|active" "$out"
+assert_contains "session start blocked if already active" "already|active" "$out"
 
 # session status reads marker from worktree
 out=$(cd "$SESSION_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session status 2>&1)
@@ -330,7 +398,7 @@ out=$(cd "$SESSION_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOM
 assert_contains "session list shows active branch" "feat/session-test" "$out"
 
 # session done marks merged in INDEX.md and removes worktree
-(cd "$SESSION_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session done >/dev/null 2>&1)
+(cd "$SESSION_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" >/dev/null 2>&1)
 assert_file_has "session done marks merged in index"   "$SESSION_INDEX" "merged"
 if [[ ! -d "$SESSION_WT" ]]; then ok "session done removes worktree directory"; else fail "session done removes worktree directory"; fi
 
@@ -338,6 +406,15 @@ if [[ ! -d "$SESSION_WT" ]]; then ok "session done removes worktree directory"; 
 (cd "$SESSION_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/session-plan --plan my-plan-slug >/dev/null 2>&1)
 SESSION_WT2="$SESSION_WORKTREES/$(basename "$SESSION_REPO")/feat-session-plan"
 assert_file_has "session start --plan writes slug to marker" "$SESSION_WT2/.claude-session" "^plan_slug=my-plan-slug"
+
+# session done must handle branch names containing regex metacharacters:
+# the index rewrite matches them as literal strings, not patterns
+(cd "$SESSION_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start 'feat/(v1.2.3)' >/dev/null 2>&1)
+SESSION_WT3="$SESSION_WORKTREES/$(basename "$SESSION_REPO")/feat-(v1.2.3)"
+if [[ -d "$SESSION_WT3" ]]; then ok "session start handles metachar branch name"; else fail "session start handles metachar branch name"; fi
+(cd "$SESSION_WT3" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" >/dev/null 2>&1)
+assert_file_has "session done marks metachar branch merged" "$SESSION_INDEX" "feat/(v1\.2\.3).*merged"
+if [[ ! -d "$SESSION_WT3" ]]; then ok "session done removes metachar worktree"; else fail "session done removes metachar worktree"; fi
 
 rm -rf "$SESSION_REPO"
 echo ""
@@ -380,7 +457,9 @@ if command -v python3 >/dev/null 2>&1; then
   fi
 fi
 
-agent_count=$(ls "$REPO_DIR/agents"/*.md 2>/dev/null | wc -l | tr -d ' ')
+agent_files=("$REPO_DIR"/agents/*.md)
+agent_count=${#agent_files[@]}
+[[ -e "${agent_files[0]}" ]] || agent_count=0
 if [[ "$agent_count" == "16" ]]; then ok "16 persona subagents generated"; else fail "16 persona subagents generated (got $agent_count)"; fi
 assert_contains "akira agent carries model tier" "model: claude-fable-5" "$(cat "$REPO_DIR/agents/akira.md")"
 assert_contains "agents marked as generated" "GENERATED from profiles" "$(cat "$REPO_DIR/agents/robin.md")"
@@ -401,6 +480,37 @@ printf 'project=demo\nbranch=feat/hooked\n' > "$HOOK_REPO/.claude-session"
 out=$(printf '{"session_id":"t3","cwd":"%s"}' "$HOOK_REPO" | HOME="$TEST_HOME" "$HOOK")
 assert_contains "session-start hook detects worktree session" "feat/hooked" "$out"
 rm -rf "$HOOK_REPO"
+
+echo ""
+
+# install.sh end to end into an isolated HOME: files land where the CLI
+# expects them, and the coordinator prompt delegates to the CLI code path
+echo "install.sh"
+
+INSTALL_HOME=$(mktemp -d)
+if (cd "$REPO_DIR" && echo "n" | HOME="$INSTALL_HOME" bash install.sh >/dev/null 2>&1); then
+  ok "install.sh runs clean with coordinator skipped"
+else
+  fail "install.sh runs clean with coordinator skipped"
+fi
+if [[ -f "$INSTALL_HOME/.claude/team/robin.md" ]]; then ok "install.sh installs profiles"; else fail "install.sh installs profiles"; fi
+if [[ -f "$INSTALL_HOME/.claude/team/tiers.conf" ]]; then ok "install.sh installs tiers.conf"; else fail "install.sh installs tiers.conf"; fi
+if [[ -f "$INSTALL_HOME/.claude/commands/robin.md" ]]; then ok "install.sh installs slash commands"; else fail "install.sh installs slash commands"; fi
+if [[ -f "$INSTALL_HOME/.claude/agents/robin.md" ]]; then ok "install.sh installs subagents"; else fail "install.sh installs subagents"; fi
+if [[ -L "$INSTALL_HOME/.local/bin/claude-team" ]]; then ok "install.sh symlinks the CLI"; else fail "install.sh symlinks the CLI"; fi
+if ! grep -qF "CLAUDE-COORDINATOR:START" "$INSTALL_HOME/.claude/CLAUDE.md" 2>/dev/null; then
+  ok "install.sh skips coordinator when told no"
+else
+  fail "install.sh skips coordinator when told no"
+fi
+
+if (cd "$REPO_DIR" && echo "prod" | HOME="$INSTALL_HOME" bash install.sh >/dev/null 2>&1); then
+  ok "install.sh runs clean with coordinator prod"
+else
+  fail "install.sh runs clean with coordinator prod"
+fi
+assert_file_has "install.sh prod answer installs prod coordinator" "$INSTALL_HOME/.claude/CLAUDE.md" "CLAUDE-COORD-MODE: prod"
+rm -rf "$INSTALL_HOME"
 
 echo ""
 

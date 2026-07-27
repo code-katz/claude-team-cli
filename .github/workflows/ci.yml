@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck (uses repo .shellcheckrc)
+        run: shellcheck bin/claude-team bin/team-session-start install.sh scripts/generate-agents.sh tests/run.sh
+
+  test-linux:
+    name: tests (linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run test suite
+        run: bash tests/run.sh
+
+  test-macos:
+    name: tests (macos, bash 3.2)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run test suite under the system bash 3.2
+        run: /bin/bash tests/run.sh

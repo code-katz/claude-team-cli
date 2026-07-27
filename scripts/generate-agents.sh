@@ -26,9 +26,11 @@ for profile in "$PROFILES"/*.md; do
   name=$(basename "$profile" .md)
   case "$name" in coordinator*) continue ;; esac
 
+  # Split "Name — Role" at the FIRST em dash (mirrors bin/claude-team), so a
+  # role may itself contain one without being truncated.
   title=$(grep -m1 '^# ' "$profile" | sed 's/^# //')
-  role=$(echo "$title" | sed 's/.*— //')
-  display=$(echo "$title" | sed 's/ —.*//')
+  role="${title#*— }"
+  display="${title%% —*}"
   model=$(awk -v p="$name" '$1 == p { print $2; exit }' "$TIERS" 2>/dev/null || echo "")
 
   out="$AGENTS/$name.md"

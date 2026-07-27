@@ -1,10 +1,6 @@
 # ShellCheck configuration for claude-team-cli
 # https://www.shellcheck.net/wiki/
 
-# Allow sourcing from paths determined at runtime
-# (e.g., sourcing profile files from ~/.claude/team/)
-disable=SC1090
-
 # Allow expressions in single-quoted strings (used in sed patterns)
 disable=SC2016
 
