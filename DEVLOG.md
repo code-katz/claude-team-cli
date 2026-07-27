@@ -5,6 +5,43 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-27] CI lands: three-job workflow, review hardening, Bash 4+ floor
+
+**Category:** `milestone`
+**Tags:** `ci`, `github-actions`, `hardening`, `bash-4`, `atomic-writes`, `tests`
+**Risk Level:** `low`
+**Breaking Change:** `behavioral` (Bash 3.2 is refused at every entry point)
+
+### Summary
+
+The repo now has continuous integration. PR #14 introduced a three-job GitHub Actions workflow (shellcheck, tests on Linux, tests on macOS) alongside code-review hardening of the CLI and a Bash 4+ requirement across every entry point; PR #15 fixed the one failure CI itself surfaced (the test suite depended on ambient git identity). main is green across all three jobs and the suite stands at 123 tests.
+
+### Detail
+
+**CI workflow (PR #14):** `.github/workflows/ci.yml` runs three jobs: `shellcheck` (ubuntu-latest, honoring the repo `.shellcheckrc`), `tests (linux)` (ubuntu-latest), and `tests (macos)` (macos-latest, which first installs a current bash via Homebrew because stock macOS ships 3.2, below the new floor).
+
+**Code-review hardening (PR #14, ecb6e8f):** bin/claude-team file handling was hardened per code review: writes are now atomic (temp file then mv) and branch-index lookups match literal names rather than treating them as patterns. `.shellcheckrc` was trimmed to three documented disables (SC2016, SC2005, SC2001).
+
+**Bash 4+ floor (PR #14, 58f79c1):** bin/claude-team, install.sh, and tests/run.sh all guard on BASH_VERSINFO and exit with a clear message (plus a `brew install bash` pointer) on anything older than Bash 4, formalizing that stock-macOS Bash 3.2 is unsupported.
+
+**CI identity fix (PR #15, bbf0993):** the session tests seed throwaway repos with real commits, which fails on machines with no git identity configured (GitHub runners, fresh installs): the seeded repo ends up with no commits, worktree creation has nothing to branch from, and 13 session assertions fail. The suite now exports its own GIT_AUTHOR_*/GIT_COMMITTER_* identity instead of depending on ambient config. Two assertions that false-passed on the runner were also tightened to match leftover index rows anywhere in the file.
+
+**Wrap-up:** all three jobs are green on main at merge commit 98c2b60. The feature branch claude/add-team-personas-9jyqiz is fully retired (GitHub auto-deleted the remote ref on merge; the local branch was removed with a merged-only check and the stale tracking ref pruned). install.sh was re-run so ~/.claude now carries all sixteen profiles, agents, and slash commands; the CLI itself needed nothing because ~/.local/bin/claude-team symlinks into the repo. Tests: 123/123 locally (103 at the previous entry).
+
+### Decisions Made
+
+- **Test macOS with Homebrew bash, not against 3.2:** the CLI and suite require Bash 4+, so the macOS job installs a current bash rather than pinning the stock shell. CI validates the supported configuration, not the explicitly dropped one.
+- **The test suite owns its git identity:** exporting GIT_AUTHOR/GIT_COMMITTER inside the suite beats configuring identity on runners, because the suite then works on any fresh machine with zero setup, the same contract install.sh implies.
+- **Merge commits retained:** PR #15 merged with the merge-commit method, matching the history of PRs #11 through #14.
+
+### Related
+
+- PR #14 (CI workflow, CLI hardening, Bash 4+ floor), PR #15 (test-suite git identity)
+- [2026-07-27] Game Development Team entry: the persona work (PRs #12 and #13) that rode this branch before the CI work
+- [2026-07-04] v0.7 entry: the launcher and worktree machinery the hardened file handling protects
+
+---
+
 ## [2026-07-27] Game Development Team: four new personas, model re-tiering, no-emdash house style
 
 **Category:** `milestone`
