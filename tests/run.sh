@@ -353,7 +353,10 @@ out=$(run_cmd launch robin --dry-run 2>&1)
 assert_contains "launch robin defaults to sonnet tier" "claude-sonnet-5" "$out"
 
 out=$(run_cmd launch sage --dry-run 2>&1)
-assert_contains "launch sage defaults to opus tier" "claude-opus-4-8" "$out"
+assert_contains "launch sage defaults to fable tier" "claude-fable-5" "$out"
+
+out=$(run_cmd launch toni --dry-run 2>&1)
+assert_contains "launch toni defaults to opus tier" "claude-opus-4-8" "$out"
 
 out=$(run_cmd launch akira --model claude-haiku-4-5 --dry-run 2>&1)
 assert_contains "launch --model overrides tier default" "claude-haiku-4-5" "$out"

@@ -41,7 +41,7 @@
 
 **Session-scoped personas** — the `/akira`-style commands no longer touch global state, so parallel sessions each keep their own persona with no cross-talk. `claude-team use` still exists for pinning a global default and now says so out loud.
 
-**`claude-team launch <persona>`** — open a dedicated Claude Code session with the persona baked in as system prompt, on its tier model (Fable 5 for Akira and River, Opus 4.8 for the consulting personas, Sonnet 5 for implementation), optionally inside an isolated worktree: `claude-team launch akira --task "design the battles API" --worktree session/1-akira-battles`.
+**`claude-team launch <persona>`** — open a dedicated Claude Code session with the persona baked in as system prompt, on its tier model (Fable 5 for the deep-reasoning personas, Opus 4.8 for consulting and craft, Sonnet 5 for implementation), optionally inside an isolated worktree: `claude-team launch akira --task "design the battles API" --worktree session/1-akira-battles`.
 
 **Delegation subagents** — sixteen generated agents let any session hand work to a persona ("have Robin review this diff") without switching. Regenerate from profiles with `scripts/generate-agents.sh`.
 
