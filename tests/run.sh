@@ -104,6 +104,10 @@ assert_contains     "shows Jordan"       "Jordan"      "$out"
 assert_contains     "shows Casey"        "Casey"       "$out"
 assert_contains     "shows Quinn"        "Quinn"       "$out"
 assert_contains     "shows Kai"          "Kai"         "$out"
+assert_contains     "shows Reiner"       "Reiner"      "$out"
+assert_contains     "shows Cornelius"    "Cornelius"   "$out"
+assert_contains     "shows Ernie"        "Ernie"       "$out"
+assert_contains     "shows Piper"        "Piper"       "$out"
 assert_not_contains "excludes Coordinator" "Coordinator" "$out"
 echo ""
 
@@ -349,7 +353,10 @@ out=$(run_cmd launch robin --dry-run 2>&1)
 assert_contains "launch robin defaults to sonnet tier" "claude-sonnet-5" "$out"
 
 out=$(run_cmd launch sage --dry-run 2>&1)
-assert_contains "launch sage defaults to opus tier" "claude-opus-4-8" "$out"
+assert_contains "launch sage defaults to fable tier" "claude-fable-5" "$out"
+
+out=$(run_cmd launch toni --dry-run 2>&1)
+assert_contains "launch toni defaults to opus tier" "claude-opus-4-8" "$out"
 
 out=$(run_cmd launch akira --model claude-haiku-4-5 --dry-run 2>&1)
 assert_contains "launch --model overrides tier default" "claude-haiku-4-5" "$out"
@@ -374,7 +381,7 @@ if command -v python3 >/dev/null 2>&1; then
 fi
 
 agent_count=$(ls "$REPO_DIR/agents"/*.md 2>/dev/null | wc -l | tr -d ' ')
-if [[ "$agent_count" == "12" ]]; then ok "12 persona subagents generated"; else fail "12 persona subagents generated (got $agent_count)"; fi
+if [[ "$agent_count" == "16" ]]; then ok "16 persona subagents generated"; else fail "16 persona subagents generated (got $agent_count)"; fi
 assert_contains "akira agent carries model tier" "model: claude-fable-5" "$(cat "$REPO_DIR/agents/akira.md")"
 assert_contains "agents marked as generated" "GENERATED from profiles" "$(cat "$REPO_DIR/agents/robin.md")"
 
