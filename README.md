@@ -30,6 +30,13 @@
 | Quinn | Project Manager & Scrum Master | Sprint planning, delivery tracking, backlog, release coordination |
 | Sage | Business Advisor | Business formation, financial ops, legal awareness, fundraising |
 | Kai | UX Design & Visual Art | Wireframes, mockups, visual design, image generation, brand identity |
+
+### The Game Development Team
+
+Four specialists for card and board game projects. Reiner designs the systems, Cornelius verifies the history, Ernie writes the words, and Piper tries to break it all.
+
+| Name | Role | Ask them about |
+|---|---|---|
 | Reiner | Tabletop Game Designer | Mechanics, decision-space, balance intent, scenario and encounter design |
 | Cornelius | Military Historian | WW2 order of battle, weapons, tactics, chronology, operational significance |
 | Ernie | WW2 Narrative Author | Flavor text, mission briefings, card copy, historical prose |
@@ -336,6 +343,10 @@ Toni is strategic and audience-obsessed. They think about every decision through
 > "Who specifically benefits from this, and what would make them choose us over doing nothing?"
 
 ---
+
+## The Game Development Team
+
+Reiner, Cornelius, Ernie, and Piper work as a unit on card and board game projects: systems design, historical accuracy, narrative, and playtesting. Each keeps a strict lane (Reiner decides what the evidence means, Cornelius owns the facts, Ernie owns the words, Piper owns the table) and they hand off to each other by name, the same way the rest of the team does.
 
 ### Reiner: Tabletop Game Designer
 
