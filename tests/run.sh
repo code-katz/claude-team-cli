@@ -27,6 +27,12 @@ ERRORS=()
 
 # ─── Temp environment ────────────────────────────────────────────────────────
 
+# The session tests create commits in throwaway repos. CI runners and fresh
+# machines have no git identity configured, so the suite provides its own
+# instead of depending on ambient config.
+export GIT_AUTHOR_NAME="claude-team-tests" GIT_AUTHOR_EMAIL="tests@claude-team.invalid"
+export GIT_COMMITTER_NAME="claude-team-tests" GIT_COMMITTER_EMAIL="tests@claude-team.invalid"
+
 TEST_HOME=$(mktemp -d)
 CLAUDE_MD="$TEST_HOME/.claude/CLAUDE.md"
 mkdir -p "$TEST_HOME/.claude"
@@ -390,7 +396,7 @@ if git -C "$SESSION_WT" status --porcelain 2>/dev/null | grep -q '.claude-sessio
 else
   ok "session marker is git-ignored in the worktree"
 fi
-assert_file_has "session start writes active status"   "$SESSION_INDEX" "active"
+assert_file_has "session start writes active status"   "$SESSION_INDEX" "feat/session-test.*active"
 
 # session start blocked if branch already active
 out=$(cd "$SESSION_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/session-test 2>&1)
@@ -406,7 +412,7 @@ assert_contains "session list shows active branch" "feat/session-test" "$out"
 
 # session done marks merged in INDEX.md and removes worktree
 (cd "$SESSION_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" >/dev/null 2>&1)
-assert_file_has "session done marks merged in index"   "$SESSION_INDEX" "merged"
+assert_file_has "session done marks merged in index"   "$SESSION_INDEX" "feat/session-test.*merged"
 if [[ ! -d "$SESSION_WT" ]]; then ok "session done removes worktree directory"; else fail "session done removes worktree directory"; fi
 
 # session start with --plan writes plan slug
