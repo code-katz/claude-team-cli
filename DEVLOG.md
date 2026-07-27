@@ -5,6 +5,54 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-27] Game Development Team: four new personas, model re-tiering, no-emdash house style
+
+**Category:** `milestone`
+**Tags:** `personas`, `game-dev-team`, `tiers`, `house-style`, `readme`
+**Risk Level:** `low`
+**Breaking Change:** `behavioral` (launch model defaults changed for Morgan, Sage, Jordan)
+
+### Summary
+
+Expanded the team from twelve to sixteen with a Game Development Team for card and board game projects (PR #12), then grouped the four in the README as their own unit (PR #13). Along the way, every persona's default model was re-tiered to the highest tier that returns value for its kind of work, and Toni's no-emdash rule was promoted to house style across all sixteen profiles.
+
+### Detail
+
+**Four new personas (PR #12):**
+
+- Reiner, Tabletop Game Designer (Fable 5): mechanics, player decision-space, elegance and complexity budgets, balance intent, LCG/co-op/deckbuilding structures, one-new-mechanic-per-scenario pacing, teach-through-play. Behaviors: the Decision Test, One New Thing, Loop Sketch.
+- Cornelius, Military Historian (Opus 4.8): WW2 order of battle, weapons and calibres, tactics, doctrine, chronology, and the operational significance of positions, in the Ambrose/Ryan tradition. Behaviors: confirmed/disputed/wrong Fact Check, Why It Mattered, Sources & Confidence.
+- Ernie, WW2 Narrative Author (Opus 4.8): flavor text, mission briefings, and card copy in the Pyle/Ambrose/Sledge tradition. Accuracy is mandatory, no taglines or second-person sales lines, historian or close-third GI register only. Behaviors: Fact then Meaning, Sensory Ground Truth, Kill Your Darlings.
+- Piper, Tabletop Playtester (Sonnet 5): dominant-line hunting, balance swings and whiff-death, first-play confusion, teachability, and session reports. Behaviors: Break It, Session Report, First-Play Lens, Numbers Pass.
+- Each shipped the full surface set: profile (single source of truth), tiers.conf entry, generated delegation agent, /name slash command, coordinator roster and routing entries in both modes, README roster/Meet the Team/Project Structure updates, plugin.json count, and test coverage (list assertions plus agent count 12 to 16).
+- Lane boundaries drawn explicitly: Reiner vs River (game craft vs product strategy), Piper vs Robin (table playtesting vs software QA), Ernie vs Toni (in-world flavor vs marketing copy).
+
+**Model re-tiering:** every persona now defaults to the highest tier that returns value.
+
+- Promoted to Fable 5: Morgan (adversarial threat modeling), Sage (legal and financial exposure), Jordan (data platform architecture). All three do low-volume, high-stakes judgment work where the deepest reasoning pays for itself.
+- Opus 4.8: Quinn, Toni, Casey, Kai, Cornelius, Ernie (judgment-heavy consulting and craft at moderate volume).
+- Sonnet 5: Sasha, Alex, Robin, Piper (high-volume implementation and execution, where the top tier costs speed without proportionate gain).
+
+**No-emdash house style:** Toni's "No emdashes in prose" rule is now the first How You Communicate bullet in all sixteen profiles, and every profile's prose was restructured (commas, colons, semicolons, parentheses, separate sentences) to contain none. Command files were rebuilt from profiles, agents regenerated, and examples/CLAUDE.md.example refreshed. Profile titles keep the "Name — Role" delimiter because bin/claude-team and scripts/generate-agents.sh parse it; normalizing Toni's " - " and Kai's "--" titles to that form also fixed Toni's and Kai's broken role display in claude-team list and their garbled generated agent descriptions.
+
+**README grouping (PR #13):** The Team at a Glance now shows the core twelve plus a Game Development Team sub-section with its own table, and Meet the Team is followed by a dedicated Game Development Team section introducing the four as a unit with their lanes and by-name handoffs.
+
+**Tests:** 103 (was 98). Four list assertions added, agent count assertion moved to 16, launch tier assertions updated (Sage now asserts Fable; Toni added as the Opus representative). install.sh runs clean.
+
+### Decisions Made
+
+- **Highest tier that returns value, not highest tier everywhere:** Fable 5 is reserved for low-volume, high-stakes judgment. Implementation personas stay on Sonnet 5 because bulk output at the top tier costs speed and tokens without proportionate quality gain.
+- **New personas kept their requested tiers:** Reiner on Fable, Cornelius and Ernie on Opus, Piper on Sonnet, exactly as specified in the original request.
+- **Titles keep the emdash delimiter:** the no-emdash rule targets prose punctuation, and the "Name — Role" H1 is a machine-parsed delimiter (get_active, cmd_list, generate-agents.sh all split on it). Going dash-free in titles would mean rewriting three parsers and the test patterns for a typographic preference the codified rule already exempts.
+- **Coordinator rosters updated with the personas:** the task list did not mention the coordinators, but past persona additions (Sage in v0.4, Kai in v0.5) updated them, and a persona the coordinator cannot route to is only half installed.
+
+### Related
+
+- PR #12 (personas, re-tiering, house style), PR #13 (README grouping)
+- [2026-07-04] v0.7 entry: introduced tiers.conf and the generated agents this work extends
+
+---
+
 ## [2026-07-04] v0.7: Session-scoped personas, launcher with model tiers, plugin packaging
 
 **Category:** `milestone`
