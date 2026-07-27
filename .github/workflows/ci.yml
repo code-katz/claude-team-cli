@@ -23,9 +23,13 @@ jobs:
         run: bash tests/run.sh
 
   test-macos:
-    name: tests (macos, bash 3.2)
+    name: tests (macos)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run test suite under the system bash 3.2
-        run: /bin/bash tests/run.sh
+      - name: Install current bash (macOS ships 3.2, below the Bash 4+ floor)
+        run: brew list bash >/dev/null 2>&1 || brew install bash
+      - name: Run test suite
+        run: |
+          bash --version | head -1
+          bash tests/run.sh

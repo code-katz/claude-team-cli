@@ -8,6 +8,13 @@
 
 set -uo pipefail
 
+# Bash 4+ required, same floor as the CLI under test.
+if [[ -z "${BASH_VERSINFO:-}" ]] || (( BASH_VERSINFO[0] < 4 )); then
+  echo "error: tests/run.sh requires Bash 4 or newer (this is ${BASH_VERSION:-not bash})." >&2
+  echo "macOS ships Bash 3.2; install a current Bash with: brew install bash" >&2
+  exit 1
+fi
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLI="$REPO_DIR/bin/claude-team"
 PROFILES_DIR="$REPO_DIR/profiles"

@@ -10,6 +10,15 @@
 
 set -euo pipefail
 
+# Bash 4+ required. macOS ships Bash 3.2 at /bin/bash for licensing reasons;
+# a current Bash is one 'brew install bash' away.
+if [[ -z "${BASH_VERSINFO:-}" ]] || (( BASH_VERSINFO[0] < 4 )); then
+  echo "error: install.sh requires Bash 4 or newer (this is ${BASH_VERSION:-not bash})." >&2
+  echo "macOS ships Bash 3.2; install a current Bash with: brew install bash" >&2
+  echo "Then run: bash install.sh" >&2
+  exit 1
+fi
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROFILES_SRC="$REPO_DIR/profiles"
 PROFILES_DST="$HOME/.claude/team"
