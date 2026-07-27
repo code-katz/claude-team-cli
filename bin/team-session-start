@@ -32,9 +32,15 @@ else
   project=$(basename "$root")
   active=""
   if [[ -f "$INDEX" ]]; then
-    active=$(awk -F'|' -v proj="$project" \
-      '$3 ~ " " proj " " && $6 ~ / active / { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $4); print $4; exit }' \
-      "$INDEX")
+    # Exact match on the trimmed project field, never a regex: project names
+    # legally contain regex metacharacters (mirrors bin/claude-team).
+    active=$(awk -F'|' -v proj="$project" '
+      {
+        p = $3; st = $6
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", p)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", st)
+        if (p == proj && st == "active") { b = $4; gsub(/^[[:space:]]+|[[:space:]]+$/, "", b); print b; exit }
+      }' "$INDEX")
   fi
   if [[ -n "$active" ]]; then
     echo "Claude Team session context: project '${project}' has registered active branch '${active}' (from ~/.claude/branches/INDEX.md). All work this session goes on that branch."

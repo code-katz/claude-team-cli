@@ -10,7 +10,7 @@
 
 > Your AI development team. Sixteen specialists, one CLI, zero meetings.
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Bash 3.2+](https://img.shields.io/badge/bash-3.2%2B-green) ![Works with Claude Code](https://img.shields.io/badge/works%20with-Claude%20Code-8A2BE2)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Bash 4+](https://img.shields.io/badge/bash-4%2B-green) ![Works with Claude Code](https://img.shields.io/badge/works%20with-Claude%20Code-8A2BE2)
 
 ---
 
@@ -813,7 +813,7 @@ claude-team-cli/
 ## Requirements
 
 - macOS or Linux
-- Bash 3.2+
+- Bash 4+ (macOS ships Bash 3.2 at `/bin/bash`; install a current Bash with `brew install bash`)
 - [Claude Code](https://claude.ai/code)
 
 ---

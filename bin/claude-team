@@ -4,6 +4,14 @@
 
 set -euo pipefail
 
+# Bash 4+ required. macOS ships Bash 3.2 at /bin/bash for licensing reasons;
+# a current Bash is one 'brew install bash' away.
+if [[ -z "${BASH_VERSINFO:-}" ]] || (( BASH_VERSINFO[0] < 4 )); then
+  echo "error: claude-team requires Bash 4 or newer (this is ${BASH_VERSION:-not bash})." >&2
+  echo "macOS ships Bash 3.2; install a current Bash with: brew install bash" >&2
+  exit 1
+fi
+
 PROFILES_DIR="${CLAUDE_TEAM_PROFILES:-$HOME/.claude/team}"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 BRANCHES_INDEX="$HOME/.claude/branches/INDEX.md"
@@ -17,14 +25,13 @@ COORD_END="<!-- CLAUDE-COORDINATOR:END -->"
 
 bold()  { printf '\033[1m%s\033[0m' "$*"; }
 green() { printf '\033[32m%s\033[0m' "$*"; }
-cyan()  { printf '\033[36m%s\033[0m' "$*"; }
 dim()   { printf '\033[2m%s\033[0m' "$*"; }
 red()   { printf '\033[31m%s\033[0m' "$*"; }
 
 die() { echo "$(red "error:") $*" >&2; exit 1; }
 
-lowercase() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
-capitalize() { echo "$1" | awk '{print toupper(substr($0,1,1)) substr($0,2)}'; }
+lowercase() { printf '%s\n' "${1,,}"; }
+capitalize() { printf '%s\n' "${1^}"; }
 
 require_profiles_dir() {
   [[ -d "$PROFILES_DIR" ]] || die "Profiles directory not found: $PROFILES_DIR
@@ -39,14 +46,65 @@ resolve_name() {
   echo "$profile"
 }
 
+# Title parsing. Profile titles use the form "# Name — Role"; both parts
+# split at the FIRST em dash so a role may itself contain one.
+profile_title() {
+  grep -m1 '^# ' "$1" | sed 's/^# //'
+}
+
+title_name() {
+  printf '%s\n' "${1%% —*}"
+}
+
+title_role() {
+  printf '%s\n' "${1#*— }"
+}
+
 get_active() {
   [[ -f "$CLAUDE_MD" ]] || { echo ""; return; }
   # Extract the name line from the active block
-  awk "/$MARKER_START/,/$MARKER_END/" "$CLAUDE_MD" \
-    | grep -m1 '^# ' \
-    | sed 's/^# //' \
-    | sed 's/ —.*//' \
-    || echo ""
+  local title
+  title=$(awk "/$MARKER_START/,/$MARKER_END/" "$CLAUDE_MD" | grep -m1 '^# ' | sed 's/^# //' || true)
+  title_name "$title"
+}
+
+# Replace the marked block in a file, or append it if absent. All edits go
+# through a temp file and land with mv: a redirection straight onto the
+# target would truncate it before the pipeline runs, so any failure could
+# destroy the user's file.
+block_install() {
+  local file="$1" start="$2" end="$3" content="$4"
+  touch "$file"
+  local tmp
+  tmp=$(mktemp)
+  if grep -qF "$start" "$file"; then
+    awk -v m="$start" 'index($0, m){exit} {print}' "$file" > "$tmp"
+    printf '%s\n%s\n%s\n' "$start" "$content" "$end" >> "$tmp"
+    awk -v m="$end" 'found{print} index($0, m){found=1}' "$file" >> "$tmp"
+  else
+    cat "$file" > "$tmp"
+    printf '\n%s\n%s\n%s\n' "$start" "$content" "$end" >> "$tmp"
+  fi
+  mv "$tmp" "$file"
+}
+
+# Remove the marked block from a file atomically. Blank lines the removed
+# block leaves at end-of-file are trimmed; everything above it, including
+# the user's own trailing spaces and leading blank lines, is preserved.
+block_remove() {
+  local file="$1" start="$2" end="$3"
+  local tmp
+  tmp=$(mktemp)
+  awk -v s="$start" -v e="$end" '
+    index($0, s){skip=1}
+    skip && index($0, e){skip=0; next}
+    !skip{lines[++n]=$0}
+    END{
+      while (n > 0 && lines[n] ~ /^[[:space:]]*$/) n--
+      for (i = 1; i <= n; i++) print lines[i]
+    }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
 }
 
 # ─── Commands ────────────────────────────────────────────────────────────────
@@ -65,12 +123,10 @@ cmd_list() {
     local name
     name=$(basename "$profile" .md)
     [[ "$name" == coordinator* ]] && continue  # coordinator profiles are not team members
-    # Extract the title line (first # heading)
-    local title
-    title=$(grep -m1 '^# ' "$profile" | sed 's/^# //')
-    # Extract the role from the title (after " — ")
-    local role
-    role=$(echo "$title" | sed 's/.*— //')
+    # Extract the title line (first # heading) and the role after the dash
+    local title role
+    title=$(profile_title "$profile")
+    role=$(title_role "$title")
 
     local name_cap
     name_cap=$(capitalize "$name")
@@ -108,30 +164,12 @@ cmd_use() {
   local profile
   profile=$(resolve_name "$name")
 
-  # Ensure CLAUDE.md exists
-  touch "$CLAUDE_MD"
-
   local content
   content=$(cat "$profile")
-
-  local block
-  block=$(printf '%s\n%s\n%s' "$MARKER_START" "$content" "$MARKER_END")
-
-  if grep -qF "$MARKER_START" "$CLAUDE_MD"; then
-    # Replace existing block by splitting around the markers
-    local tmp
-    tmp=$(mktemp)
-    awk "/$MARKER_START/{exit} {print}" "$CLAUDE_MD" > "$tmp"
-    printf '%s\n%s\n%s\n' "$MARKER_START" "$content" "$MARKER_END" >> "$tmp"
-    awk "/$MARKER_END/{found=1; next} found{print}" "$CLAUDE_MD" >> "$tmp"
-    mv "$tmp" "$CLAUDE_MD"
-  else
-    # Append block
-    printf '\n%s\n' "$block" >> "$CLAUDE_MD"
-  fi
+  block_install "$CLAUDE_MD" "$MARKER_START" "$MARKER_END" "$content"
 
   local display_name
-  display_name=$(grep -m1 '^# ' "$profile" | sed 's/^# //' | sed 's/ —.*//')
+  display_name=$(title_name "$(profile_title "$profile")")
 
   echo ""
   echo "$(green "✓") $(bold "$display_name") is now active."
@@ -154,14 +192,7 @@ cmd_reset() {
   local active
   active=$(get_active)
 
-  local tmp
-  tmp=$(mktemp)
-  awk "/$MARKER_START/{found=1} found && /$MARKER_END/{found=0; next} !found{print}" \
-    "$CLAUDE_MD" > "$tmp"
-  # Remove trailing blank lines left by removed block
-  sed -e 's/[[:space:]]*$//' "$tmp" | \
-    awk 'NF{found=1} found' > "$CLAUDE_MD" || true
-  rm -f "$tmp"
+  block_remove "$CLAUDE_MD" "$MARKER_START" "$MARKER_END"
 
   echo ""
   if [[ -n "$active" ]]; then
@@ -210,24 +241,15 @@ _coordinator_install() {
   [[ -f "$coord_file" ]] || die "Coordinator profile not found: $coord_file
 Run the installer first: bash install.sh"
 
-  touch "$CLAUDE_MD"
-  local content
+  local content refreshed=false
   content=$(cat "$coord_file")
+  if grep -qF "$COORD_START" "$CLAUDE_MD" 2>/dev/null; then refreshed=true; fi
+  block_install "$CLAUDE_MD" "$COORD_START" "$COORD_END" "$content"
 
-  if grep -qF "$COORD_START" "$CLAUDE_MD"; then
-    local tmp
-    tmp=$(mktemp)
-    awk "/$COORD_START/{exit} {print}" "$CLAUDE_MD" > "$tmp"
-    printf '%s\n%s\n%s\n' "$COORD_START" "$content" "$COORD_END" >> "$tmp"
-    awk "/$COORD_END/{found=1; next} found{print}" "$CLAUDE_MD" >> "$tmp"
-    mv "$tmp" "$CLAUDE_MD"
-    echo ""
+  echo ""
+  if [[ "$refreshed" == true ]]; then
     echo "$(green "✓") Coordinator $(bold "$mode_label") — profile refreshed."
   else
-    local block
-    block=$(printf '%s\n%s\n%s' "$COORD_START" "$content" "$COORD_END")
-    printf '\n%s\n' "$block" >> "$CLAUDE_MD"
-    echo ""
     echo "$(green "✓") Coordinator $(bold "$mode_label")."
     echo "$(dim "$mode_desc")"
   fi
@@ -262,13 +284,7 @@ cmd_coordinator() {
         return
       fi
 
-      local tmp
-      tmp=$(mktemp)
-      awk "/$COORD_START/{found=1} found && /$COORD_END/{found=0; next} !found{print}" \
-        "$CLAUDE_MD" > "$tmp"
-      sed -e 's/[[:space:]]*$//' "$tmp" | \
-        awk 'NF{found=1} found' > "$CLAUDE_MD" || true
-      rm -f "$tmp"
+      block_remove "$CLAUDE_MD" "$COORD_START" "$COORD_END"
 
       echo ""
       echo "$(green "✓") Coordinator $(bold "off")."
@@ -339,12 +355,30 @@ ensure_branches_index() {
   fi
 }
 
-get_active_branch() {
-  local project="$1"
+# Print one field (by number) from the first active index row for a project.
+# Fields: | 2=date | 3=project | 4=branch | 5=plan | 6=status | 7=notes |
+# Comparison is exact string equality after trimming, never a regex: project
+# and branch names legally contain regex metacharacters ('release/1.2.3'),
+# which as patterns cross-match other rows or fail to compile at all.
+index_active_field() {
+  local project="$1" field="$2"
   [[ -f "$BRANCHES_INDEX" ]] || { echo ""; return; }
-  awk -F'|' -v proj="$project" \
-    '$3 ~ " " proj " " && $6 ~ / active / { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $4); print $4; exit }' \
-    "$BRANCHES_INDEX"
+  awk -F'|' -v proj="$project" -v fld="$field" '
+    {
+      p = $3; st = $6
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", p)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", st)
+      if (p == proj && st == "active") {
+        v = $fld
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+        print v
+        exit
+      }
+    }' "$BRANCHES_INDEX"
+}
+
+get_active_branch() {
+  index_active_field "$1" 4
 }
 
 # ─── Branch commands ──────────────────────────────────────────────────────────
@@ -401,16 +435,20 @@ cmd_branch_close() {
 
   local tmp
   tmp=$(mktemp)
-  awk -F'|' -v proj="$project" -v ns=" $new_status " '
-    $3 ~ " " proj " " && $6 ~ / active / {
-      d=$2; sub(/^[[:space:]]+/,"",d); sub(/[[:space:]]+$/,"",d)
-      p=$3; sub(/^[[:space:]]+/,"",p); sub(/[[:space:]]+$/,"",p)
-      b=$4; sub(/^[[:space:]]+/,"",b); sub(/[[:space:]]+$/,"",b)
-      s=$5; sub(/^[[:space:]]+/,"",s); sub(/[[:space:]]+$/,"",s)
-      printf "| %s | %s | %s | %s |%s| |\n", d, p, b, s, ns
-      next
+  awk -F'|' -v proj="$project" -v ns="$new_status" '
+    {
+      p = $3; st = $6
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", p)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", st)
+      if (p == proj && st == "active") {
+        d=$2; sub(/^[[:space:]]+/,"",d); sub(/[[:space:]]+$/,"",d)
+        b=$4; sub(/^[[:space:]]+/,"",b); sub(/[[:space:]]+$/,"",b)
+        s=$5; sub(/^[[:space:]]+/,"",s); sub(/[[:space:]]+$/,"",s)
+        printf "| %s | %s | %s | %s | %s | |\n", d, p, b, s, ns
+        next
+      }
+      print
     }
-    { print }
   ' "$BRANCHES_INDEX" > "$tmp" && mv "$tmp" "$BRANCHES_INDEX"
 
   echo ""
@@ -442,13 +480,9 @@ cmd_branch_status() {
   if [[ -n "$active" ]]; then
     echo "$(bold "Active branch:") $(green "$active") $(dim "($project)")"
     # Show linked plan if any
-    if [[ -f "$BRANCHES_INDEX" ]]; then
-      local plan_slug
-      plan_slug=$(awk -F'|' -v proj="$project" \
-        '$3 ~ " " proj " " && $6 ~ / active / { gsub(/^[[:space:]]+|[[:space:]]+$/, "", $5); print $5; exit }' \
-        "$BRANCHES_INDEX")
-      [[ -n "$plan_slug" ]] && echo "$(dim "Linked plan:") $plan_slug"
-    fi
+    local plan_slug
+    plan_slug=$(index_active_field "$project" 5)
+    [[ -n "$plan_slug" ]] && echo "$(dim "Linked plan:") $plan_slug"
   else
     echo "$(bold "Active branch:") $(red "none")"
     echo "$(dim "  No branch registered for '$project'.")"
@@ -782,15 +816,19 @@ Run this from inside a session worktree, or use 'claude-team branch done' for no
   local tmp
   tmp=$(mktemp)
   awk -F'|' -v proj="$project" -v br="$branch" '
-    $3 ~ " " proj " " && $4 ~ " " br " " && $6 ~ / active / {
-      d=$2; sub(/^[[:space:]]+/,"",d); sub(/[[:space:]]+$/,"",d)
-      p=$3; sub(/^[[:space:]]+/,"",p); sub(/[[:space:]]+$/,"",p)
-      b=$4; sub(/^[[:space:]]+/,"",b); sub(/[[:space:]]+$/,"",b)
-      s=$5; sub(/^[[:space:]]+/,"",s); sub(/[[:space:]]+$/,"",s)
-      printf "| %s | %s | %s | %s | merged | worktree |\n", d, p, b, s
-      next
+    {
+      p = $3; b = $4; st = $6
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", p)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", b)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", st)
+      if (p == proj && b == br && st == "active") {
+        d=$2; sub(/^[[:space:]]+/,"",d); sub(/[[:space:]]+$/,"",d)
+        s=$5; sub(/^[[:space:]]+/,"",s); sub(/[[:space:]]+$/,"",s)
+        printf "| %s | %s | %s | %s | merged | worktree |\n", d, p, b, s
+        next
+      }
+      print
     }
-    { print }
   ' "$BRANCHES_INDEX" > "$tmp" && mv "$tmp" "$BRANCHES_INDEX"
 
   # Remove worktree (must be called from outside the worktree)
@@ -816,21 +854,31 @@ cmd_session_list() {
     echo ""
     return
   fi
-  local found=0
-  while IFS= read -r line; do
-    if echo "$line" | grep -q '| active |'; then
-      local project branch worktree_path
-      project=$(echo "$line" | awk -F'|' '{gsub(/^[[:space:]]+|[[:space:]]+$/,"",$3); print $3}')
-      branch=$(echo "$line" | awk -F'|' '{gsub(/^[[:space:]]+|[[:space:]]+$/,"",$4); print $4}')
-      worktree_path=$(get_worktree_path "$project" "$branch")
-      if [[ -d "$worktree_path" ]]; then
-        printf '  %-25s  %-40s  %s\n' "$(bold "$project")" "$branch" "$(dim "$worktree_path")"
-      else
-        printf '  %-25s  %-40s  %s\n' "$(bold "$project")" "$branch" "$(dim "(no worktree)")"
-      fi
-      found=1
+  # One awk pass extracts all active rows as tab-separated project/branch
+  # pairs; the loop then only formats, with no per-line subshells.
+  local rows
+  rows=$(awk -F'|' '
+    {
+      st = $6
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", st)
+      if (st == "active") {
+        p = $3; b = $4
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", p)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", b)
+        print p "\t" b
+      }
+    }' "$BRANCHES_INDEX")
+  local found=0 project branch worktree_path
+  while IFS=$'\t' read -r project branch; do
+    [[ -n "$project" ]] || continue
+    worktree_path=$(get_worktree_path "$project" "$branch")
+    if [[ -d "$worktree_path" ]]; then
+      printf '  %-25s  %-40s  %s\n' "$(bold "$project")" "$branch" "$(dim "$worktree_path")"
+    else
+      printf '  %-25s  %-40s  %s\n' "$(bold "$project")" "$branch" "$(dim "(no worktree)")"
     fi
-  done < "$BRANCHES_INDEX"
+    found=1
+  done <<< "$rows"
   [[ $found -eq 0 ]] && echo "  $(dim "(none)")"
   echo ""
 }
