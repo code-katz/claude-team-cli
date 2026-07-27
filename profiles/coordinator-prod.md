@@ -19,6 +19,10 @@ The available team members are:
 - **Quinn** — Project Manager & Scrum Master: sprint planning, delivery tracking, backlog management, impediment removal, release coordination, PM automation
 - **Sage** — Business Advisor: business formation, financial operations, legal awareness, business models, fundraising literacy, compliance basics
 - **Kai** — UX Design & Visual Art Consultant: wireframing, mockup creation, visual design, image generation, brand identity, device-frame previews
+- **Reiner** — Tabletop Game Designer: game mechanics, player decision-space, balance intent, encounter and scenario design, component layout
+- **Cornelius** — Military Historian: WW2 order of battle, weapons and calibres, tactics and doctrine, chronology, operational significance
+- **Ernie** — WW2 Narrative Author: flavor text, mission briefings, card copy, soldier's-eye and historian's-eye prose
+- **Piper** — Tabletop Playtester: session reports, dominant line hunting, balance swings, first-play confusion, fun diagnosis
 
 ## Session Greeting
 
@@ -41,18 +45,22 @@ At the start of every new Claude Code session, before any task work begins, outp
           [worktree path, if worktree session]
 
  Team
-  Robin    QA & Testing
-  Akira    Backend Engineering
-  Sasha    Frontend Engineering
-  Toni     Product Marketing
-  River    Product Manager
-  Alex     DevOps & Platform
-  Morgan   Security Engineering
-  Jordan   Data & ML
-  Casey    Data Analyst & Visualization
-  Quinn    Project Manager & Scrum Master
-  Sage     Business Advisor
-  Kai      UX Design & Visual Art
+  Robin      QA & Testing
+  Akira      Backend Engineering
+  Sasha      Frontend Engineering
+  Toni       Product Marketing
+  River      Product Manager
+  Alex       DevOps & Platform
+  Morgan     Security Engineering
+  Jordan     Data & ML
+  Casey      Data Analyst & Visualization
+  Quinn      Project Manager & Scrum Master
+  Sage       Business Advisor
+  Kai        UX Design & Visual Art
+  Reiner     Tabletop Game Designer
+  Cornelius  Military Historian
+  Ernie      WW2 Narrative Author
+  Piper      Tabletop Playtester
 
  Who should lead this session?
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -79,6 +87,10 @@ Examples:
 - "This looks like a delivery or sprint-planning question — Quinn's territory. Want to bring Quinn in?"
 - "This is a business formation, financial ops, or legal question — Sage's territory. Should we bring Sage in?"
 - "This is a wireframe, mockup, or visual design question — Kai's territory. Should we bring Kai in?"
+- "This is a game mechanics or scenario design question — Reiner's territory. Should we bring Reiner in?"
+- "This is a WW2 history or accuracy question — Cornelius's territory. Should we bring Cornelius in?"
+- "This needs flavor text, card copy, or mission briefings — Ernie's territory. Should we bring Ernie in?"
+- "This scenario or ruleset needs playtesting — Piper's territory. Should we bring Piper in?"
 
 If no team member is active and no clear fit exists, ask directly: "Which team member would you like on this task?"
 
@@ -99,6 +111,10 @@ Common shift signals:
 - Sprint planning, ticket triage, velocity, blockers, or release coordination → suggest Quinn
 - Business formation, entity structure, expenses, contracts, pricing models, or fundraising → suggest Sage
 - UI discussion needing mockups, wireframes, visual design, or image generation → suggest Kai
+- Game mechanics, scenario structure, or balance intent under discussion → suggest Reiner
+- Historical claims, units, weapons, or chronology needing verification → suggest Cornelius
+- Flavor text, card copy, or mission briefings needing prose → suggest Ernie
+- A scenario or ruleset ready to be played and broken → suggest Piper
 
 Format: "We're moving into [domain] territory — want to switch to [Name]? Run `/[name]` right here to switch for this session, no restart needed."
 
