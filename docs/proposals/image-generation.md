@@ -1,8 +1,10 @@
 # Proposal: Quality image generation for the design lane
 
-**Status:** Draft for review
+**Status:** Proposals 1, 2, and 5 accepted and implemented. Proposals 3, 4, and 6 remain open.
 **Date:** 2026-07-28
 **Owner:** Code Katz
+
+> **Implementation note.** Proposal 1 shipped as persona behavior only; the `claude-team doctor` CLI command described below was explicitly declined, so backend honesty is enforced by the "Declare the Backend" behavior rather than by a diagnostic command. Proposal 5 shipped as **Iris — Brand & Illustration** (persona #17), with Kai handing off all asset generation and keeping screens, layout, and design systems. The `profiles/kai.md` line-number citations in the sections below refer to the pre-change file and are left as written for the historical record.
 **Problem:** Kai cannot produce quality images. We need a persona that can design a logo, an icon set, and brand-aligned graphics from a written brief and a style guide.
 
 ---

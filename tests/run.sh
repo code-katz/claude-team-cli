@@ -118,7 +118,9 @@ assert_contains     "shows Morgan"       "Morgan"      "$out"
 assert_contains     "shows Jordan"       "Jordan"      "$out"
 assert_contains     "shows Casey"        "Casey"       "$out"
 assert_contains     "shows Quinn"        "Quinn"       "$out"
+assert_contains     "shows Sage"         "Sage"        "$out"
 assert_contains     "shows Kai"          "Kai"         "$out"
+assert_contains     "shows Iris"         "Iris"        "$out"
 assert_contains     "shows Reiner"       "Reiner"      "$out"
 assert_contains     "shows Cornelius"    "Cornelius"   "$out"
 assert_contains     "shows Ernie"        "Ernie"       "$out"
@@ -473,9 +475,41 @@ fi
 agent_files=("$REPO_DIR"/agents/*.md)
 agent_count=${#agent_files[@]}
 [[ -e "${agent_files[0]}" ]] || agent_count=0
-if [[ "$agent_count" == "16" ]]; then ok "16 persona subagents generated"; else fail "16 persona subagents generated (got $agent_count)"; fi
+if [[ "$agent_count" == "17" ]]; then ok "17 persona subagents generated"; else fail "17 persona subagents generated (got $agent_count)"; fi
 assert_contains "akira agent carries model tier" "model: claude-fable-5" "$(cat "$REPO_DIR/agents/akira.md")"
+assert_contains "iris agent carries model tier" "model: claude-opus-4-8" "$(cat "$REPO_DIR/agents/iris.md")"
 assert_contains "agents marked as generated" "GENERATED from profiles" "$(cat "$REPO_DIR/agents/robin.md")"
+
+# Regeneration drift: CI never runs generate-agents.sh, and the count check above
+# only counts files. generate-agents.sh cats the profile verbatim into the agent,
+# so every non-blank profile line must appear verbatim in its agent. Catches a
+# profile edited without regenerating.
+stale=""
+for profile in "$REPO_DIR"/profiles/*.md; do
+  pname=$(basename "$profile" .md)
+  case "$pname" in coordinator*) continue ;; esac
+  agent="$REPO_DIR/agents/$pname.md"
+  if [[ ! -f "$agent" ]]; then stale="$stale $pname(no-agent)"; continue; fi
+  drift=$(grep -v '^[[:space:]]*$' "$profile" | grep -F -x -v -c -f "$agent" - || true)
+  [[ "$drift" == "0" ]] || stale="$stale $pname($drift)"
+done
+if [[ -z "$stale" ]]; then ok "generated agents match their profiles"
+else fail "generated agents match their profiles (stale:$stale)"; fi
+
+# commands/<name>.md is hand-maintained and nothing validates it. By convention it
+# is the profile with Required Interactive Behaviors excised, 16 of 16 before Iris.
+cdrift=""
+for profile in "$REPO_DIR"/profiles/*.md; do
+  pname=$(basename "$profile" .md)
+  case "$pname" in coordinator*) continue ;; esac
+  cmd="$REPO_DIR/commands/$pname.md"
+  if [[ ! -f "$cmd" ]]; then cdrift="$cdrift $pname(no-command)"; continue; fi
+  d=$(awk '/^## Required Interactive Behaviors$/{skip=1} /^## Signature Question$/{skip=0} !skip' "$profile" \
+      | grep -v '^[[:space:]]*$' | grep -F -x -v -c -f "$cmd" - || true)
+  [[ "$d" == "0" ]] || cdrift="$cdrift $pname($d)"
+done
+if [[ -z "$cdrift" ]]; then ok "slash commands match their profiles"
+else fail "slash commands match their profiles (drift:$cdrift)"; fi
 
 # team-session-start hook behavior
 HOOK="$REPO_DIR/bin/team-session-start"
