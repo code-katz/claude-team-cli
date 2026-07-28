@@ -1,11 +1,26 @@
 # Proposal: Quality image generation for the design lane
 
-**Status:** Proposals 1, 2, and 5 accepted and implemented. Proposals 3, 4, and 6 remain open.
+**Status:** Proposals 1, 2, and 5 implemented. Proposal 3 dropped. Proposal 4 folded into Proposal 6, which remains open.
 **Date:** 2026-07-28
 **Owner:** Code Katz
+**Problem:** Kai cannot produce quality images. We need a persona that can design a logo, an icon set, and brand-aligned graphics from a written brief and a style guide.
 
 > **Implementation note.** Proposal 1 shipped as persona behavior only; the `claude-team doctor` CLI command described below was explicitly declined, so backend honesty is enforced by the "Declare the Backend" behavior rather than by a diagnostic command. Proposal 5 shipped as **Iris — Brand & Illustration** (persona #17), with Kai handing off all asset generation and keeping screens, layout, and design systems. The `profiles/kai.md` line-number citations in the sections below refer to the pre-change file and are left as written for the historical record.
-**Problem:** Kai cannot produce quality images. We need a persona that can design a logo, an icon set, and brand-aligned graphics from a written brief and a style guide.
+
+## Decisions after implementation
+
+**Proposal 3 is dropped.** Two of its justifications did not survive checking. It claims `claude-team brand init` would mirror `branch start` and `session start`; those write exclusively to `~/.claude/`, and the CLI has never written a committable file into a user's working tree (its only project writes, `.git/hooks/pre-commit` and `.git/info/exclude`, are untracked by design). It also claims to unblock the repo's "missing" `publish/style-guide.md`; that file was deliberately deleted in `04ace9e` ("consolidated to code-katz/style-guide.md"), so re-adding a per-repo brand file re-introduces what was removed on purpose. Separately, half of Proposal 3 already shipped inside Iris's Brand Brief and Asset Provenance Record behaviors, and "persona names an artifact the repo does not define" is the established convention here (Kai and Sasha have pointed at `DesignSystem.swift` with no schema since they were written). Accepted tradeoff: Iris keeps improvising a manifest shape per project. If that becomes a problem, define schemas for all four artifacts at once rather than only Iris's.
+
+**Proposal 4 is folded into Proposal 6.** They were decomposed as separate items and should not have been: the companion skill is the delivery vehicle for backend wiring. A vendor matrix inside this repo would be documentation the project does not control, drifting on someone else's release schedule, and it would break the convention that every companion capability (devlog, roadmap, plans, todo, publish, conductor) lives in its own repo while "Works Well With" stays one line and a link. Backend mechanics also serve more than Iris: Reiner and Ernie will want card art, Toni marketing graphics, Kai mockup assets. Persona content keeps the taste ("vector marks need vector-native output"); the skill takes the mechanics ("the endpoint is X, the npm package is deprecated").
+
+### Prior art for the skill
+
+Researched 2026-07-28. **Licenses were not verifiable in that session** (api.github.com returned 403 through the proxy); verify each before copying anything.
+
+- **`neonwatty/logo-designer-skill`** is the closest analogue: interview, explore (3-5 SVG concepts side by side), refine, export (PNG at 16/32/48/192/512/1024/2048). It generates SVG directly with **no image backend at all**. This is the most important finding, and it revises the framing above: the vector-mark problem does not need a vendor. Claude writing SVG, rendered at multiple sizes and run through the Visual QA Loop, is a complete logo pipeline at zero cost. The backend table below already said "Claude alone, wiring effort: None" and then under-weighted it. External backends are for raster illustration, a much narrower need than "Iris cannot make images."
+- **`designrique/ai-graphic-design-skill`** is a knowledge source rather than a pipeline (much of its workflow assumes a human driving Midjourney, Illustrator, and Photoshop). Worth borrowing: its backend decision table, which independently reaches Recraft for vector logos; its IP indemnification risk matrix; and its raster-to-vector pipeline (upscale, vectorize, bezier cleanup).
+- **`jezweb/claude-skills`** (design-assets/ai-image-generator) contributes API mechanics and one hard-won lesson: call image APIs from Python with urllib rather than curl, because shell escaping breaks on apostrophes.
+- **Anthropic's `theme-factory`** gives the structural pattern: a thin `SKILL.md` that orchestrates plus one data file per theme in a sibling directory. Mapped onto an image skill, that means one file per backend, which isolates vendor drift to a single file instead of accepting it as a standing risk.
 
 ---
 
@@ -203,7 +218,7 @@ Kai is already carrying two jobs that share a vocabulary but not a skill set:
 The Illustrator would own: the brand spec, prompt craft per backend, the Visual QA loop, the asset manifest, licensing and provenance, and set consistency (the thing that makes 10 cat badges look like 10 cats from the same studio).
 
 **Cost of adding a persona,** based on the existing 16-persona structure:
-`profiles/illustrator.md`, regenerate `agents/`, `commands/illustrator.md`, `profiles/tiers.conf`, both coordinator profiles (roster line plus routing rule), README (roster table, full section, project structure, roadmap), `install.sh` quick-start, `.claude-plugin/plugin.json` description ("Sixteen named specialist personas"), `bin/claude-team` command listing, and `tests/run.sh:476` which asserts exactly 16 subagents.
+`profiles/illustrator.md`, regenerate `agents/`, `commands/illustrator.md`, `profiles/tiers.conf`, both coordinator profiles (roster line plus routing rule), README (roster table, full section, project structure, roadmap), `install.sh` quick-start, `.claude-plugin/plugin.json` description ("Sixteen named specialist personas"), `bin/claude-team` command listing, and `tests/run.sh:476` which asserts the exact subagent count (16 at the time, 17 since Iris shipped).
 
 **Alternative worth considering:** do not split. Keep one design persona and deepen its image skills through Proposals 2 through 4. The split is worth it only if you find yourself wanting UX critique and brand asset production in the same session without them stepping on each other. My read: **do Proposals 1 through 4 first and see whether the split still feels necessary.** Personas are cheap to add and expensive to remove, and the roster is already at 16.
 
