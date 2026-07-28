@@ -448,11 +448,12 @@ The team works best with these companion tools installed alongside it. Each one 
 | [claude-todo-skill](https://github.com/code-katz/claude-todo-skill) | Lightweight task scratchpad for capturing action items from any specialist session | `/todo` |
 | [claude-publish-agent](https://github.com/code-katz/claude-publish-agent) | Publish markdown to blogging platforms; Toni helps with positioning, then you publish it | `/publish` |
 | [claude-conductor](https://github.com/code-katz/claude-conductor) | Track and coordinate parallel Claude Code sessions; see who's doing what, who's blocked, and merge order | `/conductor` |
+| [claude-illustrate-skill](https://github.com/code-katz/claude-illustrate-skill) | Brand assets with a render-and-inspect loop; Iris brings the taste, this brings the mechanics. Logos and icons need no image backend | `/illustrate` |
 
-All are invocable as slash commands once installed. They also auto-trigger on natural language: "log this", "update the roadmap", "we shipped X", "archive this plan", "add a todo", "show sessions".
+All are invocable as slash commands once installed. They also auto-trigger on natural language: "log this", "update the roadmap", "we shipped X", "archive this plan", "add a todo", "show sessions", "design a logo".
 
 ```bash
-# Install all six companion tools
+# Install the six single-file companion skills
 mkdir -p ~/.claude/skills/{devlog,roadmap,plans,todo,publish,conductor}
 curl -o ~/.claude/skills/devlog/SKILL.md \
   https://raw.githubusercontent.com/code-katz/claude-devlog-skill/main/SKILL.md
@@ -466,6 +467,13 @@ curl -o ~/.claude/skills/publish/SKILL.md \
   https://raw.githubusercontent.com/code-katz/claude-publish-agent/main/SKILL.md
 curl -o ~/.claude/skills/conductor/SKILL.md \
   https://raw.githubusercontent.com/code-katz/claude-conductor/main/skills/conductor/SKILL.md
+```
+
+`claude-illustrate-skill` is cloned rather than curled, because its backend guides and reference docs live in sibling files that `SKILL.md` reads on demand:
+
+```bash
+git clone https://github.com/code-katz/claude-illustrate-skill.git \
+  ~/.claude/skills/illustrate
 ```
 
 ---

@@ -5,6 +5,44 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-28] claude-illustrate-skill shipped: Iris gets a pipeline, logos get made without a vendor
+
+**Category:** `milestone`
+**Tags:** `skills`, `iris`, `image-generation`, `svg`, `companion-tools`, `dogfooding`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+Proposal 6 shipped as [claude-illustrate-skill](https://github.com/code-katz/claude-illustrate-skill), the seventh companion tool, carrying the backend mechanics that were deliberately kept out of claude-team-cli. Its central finding: logos and icons need no image backend at all. Iris now references it, and the README lists it.
+
+### Detail
+
+**Why a skill and not the persona repo:** a vendor MCP matrix inside claude-team-cli would be documentation the project does not control, drifting on someone else's release schedule, and it would break the convention that every companion capability lives in its own repo while "Works Well With" stays one line and a link. Backend mechanics also serve Reiner, Ernie, Toni, and Kai, not only Iris.
+
+**The load-bearing design decision:** vector marks are authored directly as SVG, rendered across the size ladder, inspected, and refined. No account, no API key, no vendor, no cost. This is the default track, not a fallback, and it answers most of what people mean by "design a logo." A generation backend is only needed for raster illustration, which is a far narrower gap than the original problem statement assumed.
+
+**Structure:** follows Anthropic's `theme-factory` pattern, a thin orchestrating `SKILL.md` plus one data file per backend, so vendor detail stays isolated in a single file. Four backends documented with verified endpoints: Recraft (the only true-SVG generator; its npm package is deprecated in favour of the remote server), Hugging Face (free tier, weakest text rendering), Canva (brand kits are Enterprise-only, the most likely wrong inference about it), and Figma (a vector editor, not a generator). `reference/manifest.md` defines the provenance format that dropped Proposal 3 never got, and `reference/ip-and-licensing.md` covers copyright, trademark, and indemnification.
+
+**Dogfooding caught three real bugs.** The render pipeline was tested rather than assumed, and every failure produced plausible-looking wrong output rather than an error: screenshotting a bare `.svg` with `--window-size` crops instead of scaling, so a "16px render" is the top-left corner of a 512px image; `<img src="...">` inside a `file://` contact sheet races the screenshot and fails silently, producing a blank sheet that reads as a design failure; and `--virtual-time-budget` is required or capture fires before layout settles. A fourth finding shaped the technique: individual small PNGs are unreadable when viewed alone, so the contact sheet is the primary inspection artifact rather than a nicety. Chromium is also frequently absent from `PATH` while present under the Playwright directory.
+
+**Wiring (claude-team-cli):** seventh "Works Well With" row, a `git clone` install line (the skill is multi-file, so the single-file curl convention the other six use would silently install only `SKILL.md`), and one line in Iris pointing at it with instructions to work without it if absent.
+
+### Decisions Made
+
+- **Clone rather than curl for this one skill:** the other six are single-file and install with `curl -o .../SKILL.md`. This one has `backends/` and `reference/` siblings that `SKILL.md` reads on demand, so curl would install a skill missing most of its content. Documented as an explicit divergence rather than silently breaking the convention.
+- **Original content, prior art credited:** all three third-party sources are MIT and could have been copied with attribution. Writing from scratch and crediting the ideas was cleaner and avoided inheriting workflows built around GUI tools that cannot be driven from Claude Code.
+- **The skill degrades rather than requiring itself:** Iris is told to say when it is relying on the skill and to work without it if absent, so the persona never claims a capability the install has not provided. That is the same rule the Kai fix established.
+
+### Related
+
+- [claude-illustrate-skill](https://github.com/code-katz/claude-illustrate-skill) (MIT)
+- [2026-07-28] Design lane split entry: created Iris and folded Proposal 4 into Proposal 6, which this closes
+- `docs/proposals/image-generation.md`: the original six-proposal option space
+
+---
+
 ## [2026-07-28] Design lane split: honest image backends, a visual QA loop, and Iris as persona #17
 
 **Category:** `milestone`
