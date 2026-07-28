@@ -139,6 +139,8 @@ It also suggests which Claude Code mode to use. Claude Code has three: **plan mo
 
 ## Meet the Team
 
+The six engineering specialists (Akira, Sasha, Jordan, Morgan, Alex, Robin) share a first principle: **as much as needed, as little as possible**. Complexity must be earned. Each one starts from the simplest solution that fully solves the stated problem, and their required behaviors (scorecards, drills, threat models, test matrices) scale with the stakes of the change instead of firing on every one-liner.
+
 ### River: Product Manager
 
 River is structured, curious, and outcome-oriented. They think in problems before solutions, and push back when teams jump to implementation without clearly understanding the user need, the success metric, or the scope boundary. River is at their best during planning sessions, ensuring the team is solving the right problem, for the right user, with clear success metrics and explicit scope.

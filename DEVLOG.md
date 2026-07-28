@@ -33,7 +33,9 @@ Kai's profile claimed image-generation tooling the product never installs, which
 
 **Roster plumbing:** `profiles/tiers.conf`, both coordinator profiles (four separate enumeration blocks each: roster bullets, fixed-width team table, routing suggestions, context-shift triggers), README (tagline, agent count, roster table, a new persona section, both project-structure trees), `.claude-plugin/plugin.json`, `install.sh`, and two listings in `bin/claude-team`.
 
-**Wrap-up:** 128/128 tests passing, shellcheck clean across all five CI-linted files, and 17/17/17 across `profiles/`, `commands/`, and `agents/`. Proposals 3 (brand spec artifact), 4 (wire a real backend), and 6 (companion skill) remain open. Until Proposal 4 lands, Kai and Iris will correctly report that no backend is connected and offer hand-authored SVG, which is the intended behavior but is not yet a logo generator.
+**Proposals 3 and 4 closed out (3f7558d):** auditing Proposal 3 (a checked-in `BRAND.md`, `assets/MANIFEST.md`, and a `claude-team brand init` command) found two justifications that do not survive checking, so it was dropped rather than deferred. Proposal 4 was folded into Proposal 6: the companion skill is the delivery vehicle for backend wiring, not a separate item. Iris now routes by asset class, treating hand-authored SVG as the primary path for vector marks rather than a fallback. No vendor names remain anywhere in persona content. The audit also caught two stale README spots where Kai was still credited with image generation across five named vendors, contradicting his own profile.
+
+**Wrap-up:** 128/128 tests passing, shellcheck clean across all five CI-linted files, and 17/17/17 across `profiles/`, `commands/`, and `agents/`. Proposal 6 (companion skill, now carrying Proposal 4's backend wiring) is the only one still open. Until it lands, Iris will hand-author SVG for logos and icons, which covers the original ask, and will correctly decline raster illustration rather than invent a backend.
 
 ### Decisions Made
 
@@ -43,13 +45,66 @@ Kai's profile claimed image-generation tooling the product never installs, which
 - **The QA loop was split, not deleted:** proposals 1 and 2 added content to Kai that proposal 5 would relocate. Rather than accept the rework, the loop was authored from the start to cover both generated assets and rendered mockups, so the split gave Kai the render-and-screenshot half and Iris the generated-asset half. Both personas landed at four behaviors, inside the house range of three to four.
 - **Backend agnostic over picking a vendor:** the profiles name a contract ("whichever backend is connected") rather than committing to Recraft, Gemini, or Canva. The vendor choice is proposal 4 and belongs to whoever is paying for it.
 - **Drift guards compare content, not counts:** the existing agent check counted files, which is why it never caught staleness. The new guards compare lines, and were proven to fail before being accepted.
+- **Proposal 3 dropped, not deferred:** its `claude-team brand init` rested on the claim that it mirrors `branch start` and `session start`, but those write only to `~/.claude/` and this CLI has never written a committable file into a user's working tree. It also claimed to unblock the "missing" `publish/style-guide.md`, which was in fact deliberately deleted in `04ace9e` and consolidated to an org-level location. Half of it had already shipped inside Iris, and naming an artifact the repo does not define is the established convention (Kai and Sasha have pointed at `DesignSystem.swift` with no schema for as long as they have existed).
+- **Proposal 4 folded into Proposal 6:** a vendor MCP matrix inside this repo would be documentation the project does not control, and it breaks the convention that every companion capability lives in its own repo while "Works Well With" stays one line and a link. Backend mechanics also serve Reiner, Ernie, Toni, and Kai, not only Iris.
+- **SVG first for vector marks:** prior-art research found that `neonwatty/logo-designer-skill` generates SVG concepts with no image backend at all. The vector-mark problem therefore needs no vendor, which narrows the backend question to raster illustration and makes the original problem statement ("Kai cannot create quality images") largely answerable without one.
+- **No "Works Well With" row until the skill exists:** linking a repo that has not been built would be the same class of bug this entry is about.
 
 ### Related
 
-- PR #16 (proposal doc, proposals 1, 2, and 5)
-- `docs/proposals/image-generation.md` (the full six-proposal option space, with proposals 3, 4, and 6 still open)
+- PR #16 (proposal doc, proposals 1, 2, and 5 implemented; 3 dropped; 4 folded into 6)
+- `docs/proposals/image-generation.md` (the full option space, with the post-implementation decision record and prior-art research for the skill)
 - [2026-03-17] Codekatz brand identity entry: the 10 cat persona badges were produced through Gemini by hand, outside any persona workflow. Iris is the attempt to bring that work in house.
 - [2026-07-27] CI entry: the three-job workflow whose agent-sync blind spot the new drift guards close
+
+---
+
+## [2026-07-28] "As much as needed, as little as possible" first principle for the six coding personas
+
+**Category:** `feature`
+**Tags:** `personas`, `first-principle`, `simplicity`, `over-engineering`, `required-interactive-behaviors`
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+The six coding personas (Akira, Sasha, Robin, Alex, Morgan, Jordan) now open with a shared first principle: as much as needed, as little as possible. Their Required Interactive Behaviors also changed from unconditional to stakes-scaled, so a one-line fix no longer triggers a full Tradeoff Scorecard, STRIDE model, or Test Matrix.
+
+### Detail
+
+Prompted by an observed failure mode: persona-led coding work was consistently over-complicated relative to the task. Two distinct causes were identified and both were addressed, because fixing only the first would have left the ceremony overhead intact.
+
+**Cause 1, no bias toward the minimum solution.** Added a `## First Principle: As Much as Needed, As Little as Possible` section to each of the six profiles, positioned first (immediately after the intro, before `## Personality`) so it frames the persona's own instincts rather than qualifying them after the fact. All six share an identical opening sentence ("Complexity must be earned. Start from the minimum that fully solves the stated problem, and add more only when a requirement that exists today demands it.") followed by four bullets in that persona's own domain language:
+
+- **Akira**: simplest architecture meeting stated scale and consistency requirements; name the threshold that justifies the next tier and stop there; every service, queue, and cache is a new failure mode and attack surface; simplicity as a security property.
+- **Sasha**: fewest states and props, no speculative flexibility; prefer the platform before a package (semantic HTML, native form controls, modern CSS); simplicity as a UX property, since less JavaScript means fewer ways to break keyboard and screen reader flows.
+- **Robin**: smallest suite that gives real confidence; test depth follows risk (exhaustive at security, money, and data-integrity boundaries, lean where failure is cheap and reversible); write each test at the lowest layer that catches the failure; coverage of what can hurt you, not a coverage percentage.
+- **Alex**: simplest infrastructure that is reproducible (a container and a managed service before an orchestration platform); name the trigger that justifies the next tier; fewer things that can page someone at 3am.
+- **Morgan**: controls matched to the actual threat model and data classification rather than a maximal checklist; severity drives response (Critical blocks, Low gets a backlog note); removal as the strongest mitigation; a control that adds complexity without reducing risk breeds workarounds, and workarounds are where breaches live.
+- **Jordan**: a scheduled query beats a platform; no ML where SQL will do; prove value before adding infrastructure; every pipeline hop is a place for silent failure to hide.
+
+**Cause 2, unconditional ceremony.** Each persona's `## Required Interactive Behaviors` section gained a one-line preamble scaling the behaviors to the stakes of the change. Akira, Sasha, Robin, and Alex use a skip variant ("mandatory for [new architecture / new components / new surfaces / deployed infrastructure]. For [routine, low-risk] changes, skip them rather than perform ceremony that adds no insight."). Morgan and Jordan use a delta variant instead, since a security- or data-touching change inside an existing system still warrants assessing what changed: "a small change inside an already-modeled system gets a delta assessment of what changed, not a fresh model."
+
+All new prose is emdash-free per the house style established in the [2026-07-27] entry below. Profiles are the single source of truth, so `scripts/generate-agents.sh` was re-run: all 16 agents regenerate deterministically and exactly the 6 coding agents changed, which confirms the delta is limited to this edit. Also added a two-line summary of the shared principle to the README under `## Meet the Team`.
+
+Scope was deliberately limited to the six coding personas. Casey and Kai were considered and excluded: both produce code (SQL and dashboards, HTML/CSS mockups) but both already carry strong minimalism doctrine (Casey's Clutter Audit and data-ink ratio, Kai's constraint-first briefs). The four Game Development Team personas were out of scope, as none of them writes code. Toni, River, Quinn, and Sage were never in scope, since the observed problem was specific to coding work.
+
+Interaction check: Sasha's Design System Gate ([2026-03-29] entry below) is unaffected. The stakes preamble exempts "copy tweaks and token-level changes," which are not the SwiftUI UI construction the gate governs. The gate still halts on a missing design system.
+
+### Decisions Made
+
+- **New top-level section over a bullet in Enterprise Security Focus:** the [2026-03-26] lint entry established that shared cross-persona guidance goes in Enterprise Security Focus to preserve the "3 behaviors + handoff" structure. That precedent was deliberately not followed here. Simplicity is not a security concern, and burying a governing principle in a mid-file bullet list would not give it the framing weight needed to counteract over-engineering. The "3 behaviors + handoff" structure is still preserved, since no 4th behavior was added, so the two decisions coexist.
+- **Positioned before `## Personality`:** placement is the mechanism. The principle has to be read before the persona's own instincts (Akira's tradeoff analysis, Morgan's adversarial default) rather than as a caveat after them.
+- **Shared opening sentence, domain-specific bullets:** same pattern as the [2026-03-26] lint rollout. The identical first sentence makes the principle recognizable as a team-wide rule, and the per-persona bullets keep it in each voice so it does not read as boilerplate.
+- **Both causes addressed, not just the code output:** the ritual overhead was a significant share of the observed over-complication, so scoping the fix to proposed solutions only would have left half the problem in place.
+- **Delta assessment over skip for Morgan and Jordan:** rejected the uniform "skip it" wording for these two. Silently skipping a threat model or lineage check on a security-relevant or data-touching change is exactly the failure mode those behaviors exist to prevent. Scaling down to a delta preserves the check while removing the ceremony.
+- **Six personas, not eight or ten:** Casey and Kai were evaluated and excluded rather than included for symmetry. Adding a minimalism principle to personas that already enforce minimalism is itself a violation of the principle.
+
+### Related
+
+- [2026-03-26] Added lint requirement to all engineer personas and coordinator: same six-persona rollout pattern, and the source of the structural precedent this entry departs from
+- [2026-07-27] Game Development Team entry: established the no-emdash house style this entry's prose follows
+- [2026-03-29] Added Design System collaboration loop between Kai and Sasha: Sasha's Design System Gate, confirmed unaffected
 
 ---
 
