@@ -5,6 +5,54 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-28] Design lane split: honest image backends, a visual QA loop, and Iris as persona #17
+
+**Category:** `milestone`
+**Tags:** `personas`, `iris`, `kai`, `image-generation`, `mcp`, `capability-claims`, `drift-guards`, `tests`
+
+**Risk Level:** `low`
+**Breaking Change:** `behavioral` (Kai no longer generates assets; brand asset work routes to Iris)
+
+### Summary
+
+Kai's profile claimed image-generation tooling the product never installs, which is the root cause behind "Kai cannot create quality images." PR #16 landed a written proposal covering the whole option space, then implemented three of its six proposals: honest backend declaration, a visual QA loop, and a lane split that adds Iris (Brand & Illustration) as persona #17. The suite grew from 123 to 128 tests, including two new guards for a class of silent drift CI could not previously catch.
+
+### Detail
+
+**The finding:** `profiles/kai.md` asserted Hugging Face MCP `dynamic_space` with FLUX.1-Krea-dev, Qwen-Image, and FLUX.1-Kontext-Dev, plus four Figma MCP tools. `install.sh` copies profiles, agents, and commands and never installs, configures, or checks an MCP server. Compounding it, no Claude model generates raster images natively, so Kai's real ceiling was markup it writes itself. The persona confidently described tools that were not present and then improvised. The session that produced this work demonstrated the bug live: the Hugging Face MCP server required authentication and was unavailable.
+
+**Proposal doc first (20eb948):** `docs/proposals/image-generation.md` separates three asset classes that were being collapsed into one ask (vector brand marks, illustrative raster, composed layouts), surveys the July 2026 backend landscape (Recraft, Gemini image models, Ideogram, Firefly, Canva MCP, Claude Design, Hugging Face FLUX, Figma MCP), and lays out six proposals with sequencing. Notable finding: Canva's brand kit and brand template autofill, the feature that would actually enforce brand alignment, is gated behind Canva Enterprise on the MCP surface.
+
+**Proposal 1, honest capability boundary (68e3a96):** the Personality paragraph now states the boundary directly, Domain Expertise bullets are backend agnostic, and a new "Declare the Backend" behavior requires naming the backend before promising an image, or saying none is connected and offering the hand-authored SVG path. Shipped as persona behavior only; a `claude-team doctor` CLI command was considered and declined.
+
+**Proposal 2, visual QA loop (68e3a96):** a behavior requiring the artifact be opened and inspected before it is shown to the user, scored against named criteria (legibility at smallest use size, palette hexes matching the brief, spelling and kerning, set consistency), with the single worst failure named and one thing revised per pass, three passes maximum. Claude is multimodal on input, so this needed no vendor and no cost.
+
+**Proposal 5, Iris as persona #17 (5c3c30d):** `profiles/iris.md` owns logo systems, wordmarks, icon sets, illustration, marketing graphics, and asset licensing and provenance, on tier `claude-opus-4-8`. Four behaviors: Declare the Backend, Brand Brief, Visual QA Loop, Asset Provenance Record. Kai keeps screens, flows, wireframes, device-frame mockups, and design systems, drops to four behaviors, and now specifies the assets a screen needs rather than generating them.
+
+**Test hardening (5c3c30d):** CI ran shellcheck plus the suite on two platforms but never ran `scripts/generate-agents.sh` and never compared `agents/` against `profiles/`. The existing check counted files only, so a profile edited without regenerating passed green while the delegation subagent served stale text. The same hole existed for `commands/`, which is hand-maintained with nothing validating it. Both are now checked per persona by verifying every non-blank profile line appears verbatim in the derived file. The guards were verified by deliberately editing a profile without regenerating (both failed as intended) and then restoring (both passed).
+
+**Roster plumbing:** `profiles/tiers.conf`, both coordinator profiles (four separate enumeration blocks each: roster bullets, fixed-width team table, routing suggestions, context-shift triggers), README (tagline, agent count, roster table, a new persona section, both project-structure trees), `.claude-plugin/plugin.json`, `install.sh`, and two listings in `bin/claude-team`.
+
+**Wrap-up:** 128/128 tests passing, shellcheck clean across all five CI-linted files, and 17/17/17 across `profiles/`, `commands/`, and `agents/`. Proposals 3 (brand spec artifact), 4 (wire a real backend), and 6 (companion skill) remain open. Until Proposal 4 lands, Kai and Iris will correctly report that no backend is connected and offer hand-authored SVG, which is the intended behavior but is not yet a logo generator.
+
+### Decisions Made
+
+- **Persona behavior over a CLI doctor command:** a `claude-team doctor` subcommand was proposed to report which image MCPs are reachable, and rejected. The false capability claims in the profile were the actual bug, and a diagnostic command does not stop a persona from making them. The runtime check also works better from inside the session, where the agent can see its own tool list.
+- **Iris, not "Illustrator":** every persona in the roster is a human first name paired with a role. Naming #17 after its function would have broken the convention that makes `/kai` and `/robin` feel like colleagues rather than modes.
+- **Kai hands off all asset generation:** the alternative of letting Kai keep "light" image work was rejected as a fuzzy boundary. Kai designs the surface, Iris produces what goes on it, mirroring the existing Kai to Sasha handoff.
+- **The QA loop was split, not deleted:** proposals 1 and 2 added content to Kai that proposal 5 would relocate. Rather than accept the rework, the loop was authored from the start to cover both generated assets and rendered mockups, so the split gave Kai the render-and-screenshot half and Iris the generated-asset half. Both personas landed at four behaviors, inside the house range of three to four.
+- **Backend agnostic over picking a vendor:** the profiles name a contract ("whichever backend is connected") rather than committing to Recraft, Gemini, or Canva. The vendor choice is proposal 4 and belongs to whoever is paying for it.
+- **Drift guards compare content, not counts:** the existing agent check counted files, which is why it never caught staleness. The new guards compare lines, and were proven to fail before being accepted.
+
+### Related
+
+- PR #16 (proposal doc, proposals 1, 2, and 5)
+- `docs/proposals/image-generation.md` (the full six-proposal option space, with proposals 3, 4, and 6 still open)
+- [2026-03-17] Codekatz brand identity entry: the 10 cat persona badges were produced through Gemini by hand, outside any persona workflow. Iris is the attempt to bring that work in house.
+- [2026-07-27] CI entry: the three-job workflow whose agent-sync blind spot the new drift guards close
+
+---
+
 ## [2026-07-27] CI lands: three-job workflow, review hardening, Bash 4+ floor
 
 **Category:** `milestone`
