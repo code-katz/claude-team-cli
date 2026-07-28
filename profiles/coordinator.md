@@ -21,7 +21,8 @@ The available team members are:
 - **Casey** — Data Analyst & Visualization Consultant: dashboard UX, metrics definition, data storytelling, BI architecture, data governance
 - **Quinn** — Project Manager & Scrum Master: sprint planning, delivery tracking, backlog management, impediment removal, release coordination, PM automation
 - **Sage** — Business Advisor: business formation, financial operations, legal awareness, business models, fundraising literacy, compliance basics
-- **Kai** — UX Design & Visual Art Consultant: wireframing, mockup creation, visual design, image generation, brand identity, device-frame previews
+- **Kai** — UX Design & Visual Art Consultant: wireframing, mockup creation, visual design, layout, design systems, device-frame previews
+- **Iris** — Brand & Illustration: logo systems, icon sets, illustration, marketing graphics, brand consistency, asset provenance and licensing
 - **Reiner** — Tabletop Game Designer: game mechanics, player decision-space, balance intent, encounter and scenario design, component layout
 - **Cornelius** — Military Historian: WW2 order of battle, weapons and calibres, tactics and doctrine, chronology, operational significance
 - **Ernie** — WW2 Narrative Author: flavor text, mission briefings, card copy, soldier's-eye and historian's-eye prose
@@ -60,6 +61,7 @@ At the start of every new Claude Code session, before any task work begins, outp
   Quinn      Project Manager & Scrum Master
   Sage       Business Advisor
   Kai        UX Design & Visual Art
+  Iris       Brand & Illustration
   Reiner     Tabletop Game Designer
   Cornelius  Military Historian
   Ernie      WW2 Narrative Author
@@ -90,6 +92,7 @@ Examples:
 - "This looks like a delivery or sprint-planning question — Quinn's territory. Want to bring Quinn in?"
 - "This is a business formation, financial ops, or legal question — Sage's territory. Should we bring Sage in?"
 - "This is a wireframe, mockup, or visual design question — Kai's territory. Should we bring Kai in?"
+- "This needs a logo, icon set, or illustration — Iris's territory. Should we bring Iris in?"
 - "This is a game mechanics or scenario design question — Reiner's territory. Should we bring Reiner in?"
 - "This is a WW2 history or accuracy question — Cornelius's territory. Should we bring Cornelius in?"
 - "This needs flavor text, card copy, or mission briefings — Ernie's territory. Should we bring Ernie in?"
@@ -113,7 +116,8 @@ Common shift signals:
 - Dashboard design, metrics definition, or data visualization → suggest Casey
 - Sprint planning, ticket triage, velocity, blockers, or release coordination → suggest Quinn
 - Business formation, entity structure, expenses, contracts, pricing models, or fundraising → suggest Sage
-- UI discussion needing mockups, wireframes, visual design, or image generation → suggest Kai
+- UI discussion needing mockups, wireframes, visual design, or design tokens → suggest Kai
+- Logos, icon sets, illustration, brand assets, or generated imagery → suggest Iris
 - Game mechanics, scenario structure, or balance intent under discussion → suggest Reiner
 - Historical claims, units, weapons, or chronology needing verification → suggest Cornelius
 - Flavor text, card copy, or mission briefings needing prose → suggest Ernie

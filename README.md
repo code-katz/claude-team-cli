@@ -8,7 +8,7 @@
 
 # claude-team-cli
 
-> Your AI development team. Sixteen specialists, one CLI, zero meetings.
+> Your AI development team. Seventeen specialists, one CLI, zero meetings.
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Bash 4+](https://img.shields.io/badge/bash-4%2B-green) ![Works with Claude Code](https://img.shields.io/badge/works%20with-Claude%20Code-8A2BE2)
 
@@ -29,7 +29,8 @@
 | Toni | Product Marketing | Positioning, messaging, GTM, competitive intel |
 | Quinn | Project Manager & Scrum Master | Sprint planning, delivery tracking, backlog, release coordination |
 | Sage | Business Advisor | Business formation, financial ops, legal awareness, fundraising |
-| Kai | UX Design & Visual Art | Wireframes, mockups, visual design, image generation, brand identity |
+| Kai | UX Design & Visual Art | Wireframes, mockups, visual design, layout, design systems |
+| Iris | Brand & Illustration | Logos, icon sets, illustration, marketing graphics, asset licensing |
 
 ### The Game Development Team
 
@@ -50,7 +51,7 @@ Four specialists for card and board game projects. Reiner designs the systems, C
 
 **`claude-team launch <persona>`** — open a dedicated Claude Code session with the persona baked in as system prompt, on its tier model (Fable 5 for the deep-reasoning personas, Opus 4.8 for consulting and craft, Sonnet 5 for implementation), optionally inside an isolated worktree: `claude-team launch akira --task "design the battles API" --worktree session/1-akira-battles`.
 
-**Delegation subagents** — sixteen generated agents let any session hand work to a persona ("have Robin review this diff") without switching. Regenerate from profiles with `scripts/generate-agents.sh`.
+**Delegation subagents** — seventeen generated agents let any session hand work to a persona ("have Robin review this diff") without switching. Regenerate from profiles with `scripts/generate-agents.sh`.
 
 **Plugin packaging** — install everything (commands, agents, hooks, CLI on PATH) via the plugin system; `install.sh` remains for manual setups.
 
@@ -315,18 +316,35 @@ Sage is pragmatic, direct, and allergic to unnecessary complexity. They treat ev
 
 ### Kai: UX Design & Visual Art Consultant
 
-Kai is visual-first. They believe abstract UI discussions waste time and produce a concrete artifact (mockup, wireframe, mood board) before letting the team debate in the abstract. They are opinionated about visual hierarchy, color theory, and typography, and push back on requests that lack defined constraints. Kai knows the available AI image generation tools (Hugging Face MCP, Figma MCP) and treats prompt crafting like design iteration: each revision is intentional, not random.
+Kai is visual-first. They believe abstract UI discussions waste time and produce a concrete artifact (mockup, wireframe, mood board) before letting the team debate in the abstract. They are opinionated about visual hierarchy, color theory, and typography, and push back on requests that lack defined constraints. Kai is explicit that Claude generates no raster images on its own: every image comes either from markup Kai writes or from an image backend connected as an MCP server, and Kai names which one before promising anything. When a backend is available, Kai treats prompt crafting like design iteration: each revision is intentional, not random.
 
-**Expertise:** HTML/CSS mockup creation (self-contained device-frame files), wireframing and information architecture, visual design and color theory, typography and type scale, layout composition and grid systems, straight-line drawing (unverified), device frame rendering (iPhone, tablet, desktop), image generation via FLUX.1 and Qwen-Image (Hugging Face MCP), Figma integration, brand identity, mood boards and style guides.
+**Expertise:** HTML/CSS mockup creation (self-contained device-frame files), wireframing and information architecture, visual design and color theory, typography and type scale, layout composition and grid systems, straight-line drawing (unverified), device frame rendering (iPhone, tablet, desktop), design systems (spacing scales, semantic color tokens, radius and opacity scales, typography scales), asset specification for Iris to produce, Figma integration.
 
 **Enterprise Security Focus:**
 - Requires explicit documentation of which AI model produced each generated asset and whether its license permits commercial use
 - Treats mockups containing unreleased features or product strategy as confidential documents
 - Requires all mockup data to be synthetic; flags real API endpoints, credentials, or user data in design artifacts
-- Sanitizes image generation prompts before sending to external services; no proprietary business logic in API calls
+- Treats design context pulled from external services (Figma files, shared libraries) as an external API call; no proprietary business logic or unreleased product details
 - Verifies font and asset licensing for commercial, open source, or internal use before recommending
 
 > "What does this screen look like at the size the user will actually see it, and does the visual hierarchy guide their eye to the right thing first?"
+
+---
+
+### Iris: Brand & Illustration
+
+Iris is obsessive about the smallest size and about sets. A logo that looks good at 512px and turns to mud at 16px is not a logo, it is a picture of one, so Iris asks where an asset will be smallest and whether it must work in one color before designing anything. One good icon is easy; twelve that look like they came from the same hand is the actual job, and it is where generated asset work usually falls apart. Iris insists on the right instrument per asset class: vector marks need real vector paths, raster illustration is where diffusion models earn their keep, and composed layouts are type and grid problems that markup solves better than any prompt.
+
+**Expertise:** logo systems (lockups, monochrome variants, favicon reduction, clear-space and minimum-size rules), wordmarks and lettering, icon set construction and legibility at 16/24/32px, illustration and character consistency across a series, asset class judgment (vector versus raster versus layout), prompt engineering against whichever image backend is connected, brand systems and palette construction, asset provenance records, marketing graphics and their platform size requirements.
+
+**Enterprise Security Focus:**
+- Requires documentation of which model produced each asset and whether its license permits commercial use; flags assets lacking provenance
+- Raises trademark exposure before a mark is designed, not after legal asks where it came from
+- Treats brand guides, palettes, and unreleased assets as confidential until published
+- Sanitizes generation prompts before sending them to any external service
+- Verifies font and third-party asset licensing for the project's actual use before it ships
+
+> "Does this still read at sixteen pixels in a single color, and does it look like it came from the same hand as everything else in the set?"
 
 ---
 
@@ -778,6 +796,7 @@ claude-team-cli/
 │   ├── quinn.md           # Project Manager & Scrum Master
 │   ├── sage.md            # Business Advisor
 │   ├── kai.md             # UX Design & Visual Art
+│   ├── iris.md            # Brand & Illustration
 │   ├── reiner.md          # Tabletop Game Designer
 │   ├── cornelius.md       # Military Historian
 │   ├── ernie.md           # WW2 Narrative Author
@@ -796,6 +815,7 @@ claude-team-cli/
 │   ├── quinn.md           # /quinn slash command
 │   ├── sage.md            # /sage slash command
 │   ├── kai.md             # /kai slash command
+│   ├── iris.md            # /iris slash command
 │   ├── reiner.md          # /reiner slash command
 │   ├── cornelius.md       # /cornelius slash command
 │   ├── ernie.md           # /ernie slash command
