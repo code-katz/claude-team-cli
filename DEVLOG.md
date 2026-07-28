@@ -5,6 +5,55 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-28] "As much as needed, as little as possible" first principle for the six coding personas
+
+**Category:** `feature`
+**Tags:** `personas`, `first-principle`, `simplicity`, `over-engineering`, `required-interactive-behaviors`
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+The six coding personas (Akira, Sasha, Robin, Alex, Morgan, Jordan) now open with a shared first principle: as much as needed, as little as possible. Their Required Interactive Behaviors also changed from unconditional to stakes-scaled, so a one-line fix no longer triggers a full Tradeoff Scorecard, STRIDE model, or Test Matrix.
+
+### Detail
+
+Prompted by an observed failure mode: persona-led coding work was consistently over-complicated relative to the task. Two distinct causes were identified and both were addressed, because fixing only the first would have left the ceremony overhead intact.
+
+**Cause 1, no bias toward the minimum solution.** Added a `## First Principle: As Much as Needed, As Little as Possible` section to each of the six profiles, positioned first (immediately after the intro, before `## Personality`) so it frames the persona's own instincts rather than qualifying them after the fact. All six share an identical opening sentence ("Complexity must be earned. Start from the minimum that fully solves the stated problem, and add more only when a requirement that exists today demands it.") followed by four bullets in that persona's own domain language:
+
+- **Akira**: simplest architecture meeting stated scale and consistency requirements; name the threshold that justifies the next tier and stop there; every service, queue, and cache is a new failure mode and attack surface; simplicity as a security property.
+- **Sasha**: fewest states and props, no speculative flexibility; prefer the platform before a package (semantic HTML, native form controls, modern CSS); simplicity as a UX property, since less JavaScript means fewer ways to break keyboard and screen reader flows.
+- **Robin**: smallest suite that gives real confidence; test depth follows risk (exhaustive at security, money, and data-integrity boundaries, lean where failure is cheap and reversible); write each test at the lowest layer that catches the failure; coverage of what can hurt you, not a coverage percentage.
+- **Alex**: simplest infrastructure that is reproducible (a container and a managed service before an orchestration platform); name the trigger that justifies the next tier; fewer things that can page someone at 3am.
+- **Morgan**: controls matched to the actual threat model and data classification rather than a maximal checklist; severity drives response (Critical blocks, Low gets a backlog note); removal as the strongest mitigation; a control that adds complexity without reducing risk breeds workarounds, and workarounds are where breaches live.
+- **Jordan**: a scheduled query beats a platform; no ML where SQL will do; prove value before adding infrastructure; every pipeline hop is a place for silent failure to hide.
+
+**Cause 2, unconditional ceremony.** Each persona's `## Required Interactive Behaviors` section gained a one-line preamble scaling the behaviors to the stakes of the change. Akira, Sasha, Robin, and Alex use a skip variant ("mandatory for [new architecture / new components / new surfaces / deployed infrastructure]. For [routine, low-risk] changes, skip them rather than perform ceremony that adds no insight."). Morgan and Jordan use a delta variant instead, since a security- or data-touching change inside an existing system still warrants assessing what changed: "a small change inside an already-modeled system gets a delta assessment of what changed, not a fresh model."
+
+All new prose is emdash-free per the house style established in the [2026-07-27] entry below. Profiles are the single source of truth, so `scripts/generate-agents.sh` was re-run: all 16 agents regenerate deterministically and exactly the 6 coding agents changed, which confirms the delta is limited to this edit. Also added a two-line summary of the shared principle to the README under `## Meet the Team`.
+
+Scope was deliberately limited to the six coding personas. Casey and Kai were considered and excluded: both produce code (SQL and dashboards, HTML/CSS mockups) but both already carry strong minimalism doctrine (Casey's Clutter Audit and data-ink ratio, Kai's constraint-first briefs). The four Game Development Team personas were out of scope, as none of them writes code. Toni, River, Quinn, and Sage were never in scope, since the observed problem was specific to coding work.
+
+Interaction check: Sasha's Design System Gate ([2026-03-29] entry below) is unaffected. The stakes preamble exempts "copy tweaks and token-level changes," which are not the SwiftUI UI construction the gate governs. The gate still halts on a missing design system.
+
+### Decisions Made
+
+- **New top-level section over a bullet in Enterprise Security Focus:** the [2026-03-26] lint entry established that shared cross-persona guidance goes in Enterprise Security Focus to preserve the "3 behaviors + handoff" structure. That precedent was deliberately not followed here. Simplicity is not a security concern, and burying a governing principle in a mid-file bullet list would not give it the framing weight needed to counteract over-engineering. The "3 behaviors + handoff" structure is still preserved, since no 4th behavior was added, so the two decisions coexist.
+- **Positioned before `## Personality`:** placement is the mechanism. The principle has to be read before the persona's own instincts (Akira's tradeoff analysis, Morgan's adversarial default) rather than as a caveat after them.
+- **Shared opening sentence, domain-specific bullets:** same pattern as the [2026-03-26] lint rollout. The identical first sentence makes the principle recognizable as a team-wide rule, and the per-persona bullets keep it in each voice so it does not read as boilerplate.
+- **Both causes addressed, not just the code output:** the ritual overhead was a significant share of the observed over-complication, so scoping the fix to proposed solutions only would have left half the problem in place.
+- **Delta assessment over skip for Morgan and Jordan:** rejected the uniform "skip it" wording for these two. Silently skipping a threat model or lineage check on a security-relevant or data-touching change is exactly the failure mode those behaviors exist to prevent. Scaling down to a delta preserves the check while removing the ceremony.
+- **Six personas, not eight or ten:** Casey and Kai were evaluated and excluded rather than included for symmetry. Adding a minimalism principle to personas that already enforce minimalism is itself a violation of the principle.
+
+### Related
+
+- [2026-03-26] Added lint requirement to all engineer personas and coordinator: same six-persona rollout pattern, and the source of the structural precedent this entry departs from
+- [2026-07-27] Game Development Team entry: established the no-emdash house style this entry's prose follows
+- [2026-03-29] Added Design System collaboration loop between Kai and Sasha: Sasha's Design System Gate, confirmed unaffected
+
+---
+
 ## [2026-07-27] CI lands: three-job workflow, review hardening, Bash 4+ floor
 
 **Category:** `milestone`
