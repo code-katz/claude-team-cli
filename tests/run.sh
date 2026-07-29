@@ -434,6 +434,90 @@ if [[ ! -d "$SESSION_WT3" ]]; then ok "session done removes metachar worktree"; 
 rm -rf "$SESSION_REPO"
 echo ""
 
+# Shared-state concurrency. ~/.claude/branches/INDEX.md and ~/.claude/CLAUDE.md
+# are shared across every session on the machine, and parallel sessions are the
+# product's headline feature, so concurrent access is the designed-for case.
+# Measured on the unlocked code: 8 of 12 rows survived, and CLAUDE.md grew
+# duplicate marker blocks when block_install took its append path against a
+# writer that had not landed yet.
+echo "shared-state concurrency"
+
+CONC_HOME=$(mktemp -d)
+CONC_INDEX="$CONC_HOME/.claude/branches/INDEX.md"
+mkdir -p "$CONC_HOME/.claude"
+CONC_ROOT=$(mktemp -d)
+for i in 1 2 3 4 5 6 7 8; do
+  git init -q "$CONC_ROOT/r$i"
+  (cd "$CONC_ROOT/r$i" && git commit -q --allow-empty -m init)
+done
+# Seed four registered branches, sequentially, so there is something to rewrite.
+for i in 1 2 3 4; do
+  (cd "$CONC_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" branch start "feat/c$i" >/dev/null 2>&1)
+done
+# Four rewriters and four appenders at once. A rewriter reads the whole index,
+# transforms it, and renames over it; an append landing inside that window is
+# erased by the rename, however atomic the append itself was.
+for i in 1 2 3 4; do
+  (cd "$CONC_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" branch done >/dev/null 2>&1) &
+done
+for i in 5 6 7 8; do
+  (cd "$CONC_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" branch start "feat/c$i" >/dev/null 2>&1) &
+done
+wait
+assert_count    "concurrent writers keep every row"     "$CONC_INDEX" '^| 2'       8
+assert_count    "concurrent rewrites all applied"       "$CONC_INDEX" '| merged |' 4
+assert_count    "concurrent appends all survived"       "$CONC_INDEX" '| active |' 4
+assert_file_has "concurrent writers keep the header"    "$CONC_INDEX" "Branch Index"
+if [[ ! -d "$CONC_INDEX.lock" ]]; then ok "no lock directory remains after success"; else fail "no lock directory remains after success"; fi
+rm -rf "$CONC_ROOT"
+
+# CLAUDE.md has two independent marker blocks written by different commands.
+# The duplicate-block count is the assertion that matters: block_install greps
+# for its start marker, misses it against an unlanded concurrent write, and
+# takes the append path, producing a second copy.
+CONC_MD="$CONC_HOME/.claude/CLAUDE.md"
+printf 'keep-this-line\n' > "$CONC_MD"
+for _ in 1 2 3 4 5; do
+  (CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" use akira >/dev/null 2>&1) &
+  (CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" coordinator on >/dev/null 2>&1) &
+done
+wait
+assert_count "concurrent writers leave one team block"        "$CONC_MD" "CLAUDE-TEAM:START"        1
+assert_count "concurrent writers leave one coordinator block" "$CONC_MD" "CLAUDE-COORDINATOR:START" 1
+assert_count "concurrent writers keep user content"           "$CONC_MD" "keep-this-line"           1
+rm -rf "$CONC_HOME"
+echo ""
+
+# Temp files must be created beside their destination, not in TMPDIR. A
+# cross-device rename degrades to copy plus unlink, during which a reader can
+# see a half-written index. An unusable TMPDIR proves the temp file is not
+# there: bare mktemp cannot create a file at all under this setting.
+echo "writes do not depend on TMPDIR"
+
+TMP_HOME=$(mktemp -d)
+mkdir -p "$TMP_HOME/.claude"
+TMP_REPO=$(mktemp -d)
+git init -q "$TMP_REPO"
+(cd "$TMP_REPO" && git commit -q --allow-empty -m init)
+run_notmp() {
+  TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" "$@"
+}
+for spec in "use akira:use" "reset:reset" "coordinator on:coordinator on"; do
+  if run_notmp ${spec%%:*} >/dev/null 2>&1; then ok "${spec##*:} works when TMPDIR is unusable"
+  else fail "${spec##*:} works when TMPDIR is unusable"; fi
+done
+if (cd "$TMP_REPO" && TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" branch start feat/notmp >/dev/null 2>&1); then
+  ok "branch start works when TMPDIR is unusable"
+else fail "branch start works when TMPDIR is unusable"; fi
+if (cd "$TMP_REPO" && TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" branch done >/dev/null 2>&1); then
+  ok "branch done works when TMPDIR is unusable"
+else fail "branch done works when TMPDIR is unusable"; fi
+if [[ -z "$(find "$TMP_HOME" -name '.claude-team.*' 2>/dev/null)" ]]; then
+  ok "no temp file litter left in ~/.claude"
+else fail "no temp file litter left in ~/.claude"; fi
+rm -rf "$TMP_HOME" "$TMP_REPO"
+echo ""
+
 # launch + plugin surfaces
 echo "launch + plugin surfaces"
 
