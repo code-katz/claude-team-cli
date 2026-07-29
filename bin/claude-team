@@ -31,6 +31,16 @@ yellow() { printf '\033[33m%s\033[0m' "$*"; }
 
 die() { echo "$(red "error:") $*" >&2; exit 1; }
 
+# Claude Code registers subagents and hooks when a session starts, and reads
+# slash commands on demand. So a sync activates the slash commands immediately
+# and leaves the other two waiting for the next session. Saying so is the whole
+# point: a green checkmark on all three reads as "all three are live now".
+say_session_scope() {
+  echo ""
+  echo "$(dim "Live now: slash commands (/akira, /robin, ...). No restart needed.")"
+  echo "$(dim "Next session: subagents and the SessionStart hook. Claude Code registers those at startup.")"
+}
+
 lowercase() { printf '%s\n' "${1,,}"; }
 capitalize() { printf '%s\n' "${1^}"; }
 
@@ -1158,6 +1168,7 @@ Make sure you are running this from the claude-team-cli repo."
   mkdir -p "$commands_dst"
   cp "$repo_dir/commands"/*.md "$commands_dst/"
   echo "$(green "✓") Slash commands synced to $(dim "$commands_dst")"
+  say_session_scope
   echo ""
   echo "$(dim "Edit profiles in $repo_dir/profiles, then rerun: claude-team sync")"
   echo ""
@@ -1230,6 +1241,9 @@ os.replace(tmp, settings_path)
 PY
 
   echo "$(green "✓") SessionStart hook registered: $(dim "$settings")"
+  # A SessionStart hook cannot fire in the session that registers it, so a bare
+  # checkmark here reads as "it ran" when nothing has run yet.
+  echo "$(dim "  Runs from your next Claude Code session onward, not this one.")"
 }
 
 cmd_help() {

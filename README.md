@@ -766,6 +766,19 @@ Your existing `~/.claude/CLAUDE.md` content is preserved. The team member profil
 
 ---
 
+## Customizing the Team
+
+There are two supported ways to change how a persona behaves, and both keep one source of truth:
+
+- **Open a pull request.** If the change makes the persona better for everyone, send it upstream. See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Fork the repo.** If the change is specific to how you or your team work, fork and own your copy. `git pull` from upstream when you want the improvements.
+
+There is deliberately no third option. A per-user override layer was on the roadmap and was retired: it would mean two competing definitions of a persona, and no reliable way to tell whether Akira is behaving like upstream Akira or like your local edit. One source of truth is worth more than the convenience.
+
+Practically: edit `profiles/<name>.md` in your clone, run `claude-team sync`, and never hand-edit anything under `~/.claude/`.
+
+---
+
 ## Adding Your Own Team Members
 
 1. Create a new profile file in `profiles/`:
@@ -776,15 +789,17 @@ cp profiles/robin.md profiles/yourname.md
 
 2. Edit it to define the persona, expertise, security focus, and communication style.
 
-3. Optionally add a model tier in `profiles/tiers.conf`.
+3. Keep the `## Greeting` section, and write one line for your persona. It is the sentence they say when someone runs `/yourname`. This is required: `scripts/generate-agents.sh` refuses to run without it, so a missing greeting stops the install rather than shipping a broken slash command.
 
-4. Install it everywhere:
+4. Optionally add a model tier in `profiles/tiers.conf`.
+
+5. Install it everywhere:
 
 ```bash
 claude-team sync
 ```
 
-5. Activate it:
+6. Activate it:
 
 ```bash
 claude-team use yourname
@@ -898,7 +913,7 @@ The `0.4` through `0.7` numbers used during development are retired. v1 is the f
 - `claude-team sync` propagates a profile edit to all three installed copies
 - `claude-team install-hook` registers session context on the clone install path
 - Plain technical English standard for the six coding specialists ([WRITING.md](WRITING.md))
-- 135-test suite covering the CLI commands, both coordinator modes, and the install path
+- 170-test suite covering the CLI commands, both coordinator modes, and the install path
 
 ### v1.0
 
@@ -915,6 +930,4 @@ The `0.4` through `0.7` numbers used during development are retired. v1 is the f
 
 If any of these would change how you use the tool, [open an issue](https://github.com/code-katz/claude-team-cli/issues).
 
-- **Local profile overrides:** `~/.claude/team/local/` for per-user customizations without forking the repo. This is the next thing we want to build. `claude-team sync` made persona edits stick across all three copies, but the edit still lives in tracked files that the next `git pull` overwrites. Overrides are what turn "customize a persona" into something you only have to do once.
-- **Team-scoped profiles:** `claude-team init` creates a `.claude-team/` config in a project repo, shared across the dev team
 - **Session handoff briefing:** when switching team members mid-task, the coordinator generates a structured briefing so the incoming specialist doesn't start cold

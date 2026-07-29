@@ -691,8 +691,28 @@ assert_file_has "sync regenerates the subagent from the edited profile" \
 assert_file_has "sync regenerates the slash command from the edited profile" \
   "$SYNC_HOME/.claude/commands/robin.md" "SYNC-PROFILE-MARKER"
 assert_file_has "sync installs tiers.conf" "$SYNC_HOME/.claude/team/tiers.conf" "akira"
+# Three green checkmarks read as "all three are live now". Only the slash
+# commands are: Claude Code registers subagents and hooks at session start.
+out=$(HOME="$SYNC_HOME" bash "$SYNC_REPO/bin/claude-team" sync 2>&1)
+assert_contains "sync says slash commands are live now"        "No restart needed" "$out"
+assert_contains "sync says subagents wait for a new session"   "Next session"      "$out"
 rm -rf "$SYNC_REPO" "$SYNC_HOME"
 
+echo ""
+
+# Messaging accuracy. Nothing asserted any of these strings before, so a
+# checkmark could claim a capability that is not live yet and CI stayed green.
+echo "session-scope messaging"
+
+out=$(run_cmd install-hook 2>&1)
+assert_contains "install-hook says the hook starts next session" "next Claude Code session" "$out"
+out=$(run_cmd install-commands 2>&1)
+assert_contains "install-commands still promises immediacy" "No new session required" "$out"
+out=$(run_cmd use robin 2>&1)
+assert_contains "use still asks for a new session" "Start a new Claude Code session" "$out"
+run_cmd reset >/dev/null 2>&1
+assert_file_has "installer names the restart requirement" "$REPO_DIR/install.sh" "Start a new Claude Code session"
+assert_file_lacks "installer no longer claims the team is ready" "$REPO_DIR/install.sh" "dev team is ready"
 echo ""
 
 # install.sh end to end into an isolated HOME: files land where the CLI
