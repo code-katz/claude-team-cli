@@ -481,35 +481,49 @@ assert_contains "iris agent carries model tier" "model: claude-opus-4-8" "$(cat 
 assert_contains "agents marked as generated" "GENERATED from profiles" "$(cat "$REPO_DIR/agents/robin.md")"
 
 # Regeneration drift: CI never runs generate-agents.sh, and the count check above
-# only counts files. generate-agents.sh cats the profile verbatim into the agent,
-# so every non-blank profile line must appear verbatim in its agent. Catches a
-# profile edited without regenerating.
+# only counts files. generate-agents.sh copies the profile into the agent verbatim
+# except for the ## Greeting section, which belongs to the slash command. So every
+# non-blank profile line above ## Greeting must appear verbatim in its agent.
+# Catches a profile edited without regenerating.
 stale=""
 for profile in "$REPO_DIR"/profiles/*.md; do
   pname=$(basename "$profile" .md)
   case "$pname" in coordinator*) continue ;; esac
   agent="$REPO_DIR/agents/$pname.md"
   if [[ ! -f "$agent" ]]; then stale="$stale $pname(no-agent)"; continue; fi
-  drift=$(grep -v '^[[:space:]]*$' "$profile" | grep -F -x -v -c -f "$agent" - || true)
+  drift=$(awk '/^## Greeting$/ { exit } { print }' "$profile" \
+      | grep -v '^[[:space:]]*$' | grep -F -x -v -c -f "$agent" - || true)
   [[ "$drift" == "0" ]] || stale="$stale $pname($drift)"
 done
 if [[ -z "$stale" ]]; then ok "generated agents match their profiles"
 else fail "generated agents match their profiles (stale:$stale)"; fi
 
-# commands/<name>.md is hand-maintained and nothing validates it. By convention it
-# is the profile with Required Interactive Behaviors excised, 16 of 16 before Iris.
+# Same drift check for commands/, which generate-agents.sh derives from the same
+# profile: Required Interactive Behaviors excised, and the ## Greeting heading
+# replaced by its sentence as the trailer. So every non-blank profile line outside
+# those two sections, plus the greeting sentence, must appear verbatim in the
+# slash command.
 cdrift=""
 for profile in "$REPO_DIR"/profiles/*.md; do
   pname=$(basename "$profile" .md)
   case "$pname" in coordinator*) continue ;; esac
   cmd="$REPO_DIR/commands/$pname.md"
   if [[ ! -f "$cmd" ]]; then cdrift="$cdrift $pname(no-command)"; continue; fi
-  d=$(awk '/^## Required Interactive Behaviors$/{skip=1} /^## Signature Question$/{skip=0} !skip' "$profile" \
+  d=$(awk '/^## Required Interactive Behaviors$/{skip=1} /^## Signature Question$/{skip=0}
+           /^## Greeting$/{next} !skip' "$profile" \
       | grep -v '^[[:space:]]*$' | grep -F -x -v -c -f "$cmd" - || true)
   [[ "$d" == "0" ]] || cdrift="$cdrift $pname($d)"
 done
-if [[ -z "$cdrift" ]]; then ok "slash commands match their profiles"
-else fail "slash commands match their profiles (drift:$cdrift)"; fi
+if [[ -z "$cdrift" ]]; then ok "generated commands match their profiles"
+else fail "generated commands match their profiles (drift:$cdrift)"; fi
+
+# The greeting is a persona-switch line ("Greet the user briefly as Robin"). A
+# delegated subagent never switches the session, so it must not carry one.
+if grep -q '^## Greeting$' "$REPO_DIR"/agents/*.md; then
+  fail "greeting excluded from generated agents"
+else
+  ok "greeting excluded from generated agents"
+fi
 
 # team-session-start hook behavior
 HOOK="$REPO_DIR/bin/team-session-start"
@@ -530,18 +544,21 @@ rm -rf "$HOOK_REPO"
 
 echo ""
 
-# claude-team sync: a persona lives as three self-contained installed files, so
-# a profile edit must reach the profile copy AND the regenerated subagent, and a
-# command edit must reach the slash command. Runs against a throwaway clone so
-# the edits never touch the real repo.
+# claude-team sync: a persona lives as three self-contained installed files, and
+# the profile is the only one a human edits. One profile edit must reach the
+# installed profile, the regenerated subagent, and the regenerated slash command.
+# Runs against a throwaway clone so the edits never touch the real repo.
 echo "claude-team sync"
 
 SYNC_REPO=$(mktemp -d)
 SYNC_HOME=$(mktemp -d)
 cp -R "$REPO_DIR"/profiles "$REPO_DIR"/commands "$REPO_DIR"/agents \
       "$REPO_DIR"/scripts "$REPO_DIR"/bin "$SYNC_REPO/"
-printf '\nSYNC-PROFILE-MARKER\n' >> "$SYNC_REPO/profiles/robin.md"
-printf '\nSYNC-COMMAND-MARKER\n' >> "$SYNC_REPO/commands/robin.md"
+# Insert above ## Greeting, not at end of file: the greeting is the slash command
+# trailer, and everything under that heading is excised from the other two copies.
+awk '/^## Greeting$/ { print "SYNC-PROFILE-MARKER"; print "" } { print }' \
+    "$SYNC_REPO/profiles/robin.md" > "$SYNC_REPO/profiles/robin.md.new"
+mv "$SYNC_REPO/profiles/robin.md.new" "$SYNC_REPO/profiles/robin.md"
 
 if HOME="$SYNC_HOME" bash "$SYNC_REPO/bin/claude-team" sync >/dev/null 2>&1; then
   ok "claude-team sync runs clean"
@@ -552,8 +569,8 @@ assert_file_has "sync propagates a profile edit to the installed profile" \
   "$SYNC_HOME/.claude/team/robin.md" "SYNC-PROFILE-MARKER"
 assert_file_has "sync regenerates the subagent from the edited profile" \
   "$SYNC_HOME/.claude/agents/robin.md" "SYNC-PROFILE-MARKER"
-assert_file_has "sync propagates a command edit to the installed command" \
-  "$SYNC_HOME/.claude/commands/robin.md" "SYNC-COMMAND-MARKER"
+assert_file_has "sync regenerates the slash command from the edited profile" \
+  "$SYNC_HOME/.claude/commands/robin.md" "SYNC-PROFILE-MARKER"
 assert_file_has "sync installs tiers.conf" "$SYNC_HOME/.claude/team/tiers.conf" "akira"
 rm -rf "$SYNC_REPO" "$SYNC_HOME"
 

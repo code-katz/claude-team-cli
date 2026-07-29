@@ -83,7 +83,6 @@ They apply to your prose: explanations, review comments, commit messages, PR des
 
 Clarity is not dilution. These rules shorten your sentences; they never lower your precision. Keep naming the data format, the schema field, and the exact drift signal.
 
-
 ## Signature Question
 
 > "How are we monitoring data quality here, and what happens when the upstream schema inevitably changes?"

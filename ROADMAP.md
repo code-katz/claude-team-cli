@@ -21,7 +21,8 @@ v1 delivered the roster and the coordinator. v2 closes the gaps that made the te
 - [x] `claude-team sync` — one command propagates a profile edit to all three installed copies
 - [x] `claude-team install-hook` — the SessionStart hook now registers on the `install.sh` path, not only the plugin path
 - [x] Plain technical English standard for the six coding specialists, documented in [WRITING.md](WRITING.md)
-- [x] 135-test suite covering the CLI commands, both coordinator modes, and the install path
+- [x] Slash commands generated from profiles, so a new persona means writing one file instead of three
+- [x] 136-test suite covering the CLI commands, both coordinator modes, and the install path
 
 ### Shipped — v1.0
 
@@ -41,7 +42,7 @@ v1 delivered the roster and the coordinator. v2 closes the gaps that made the te
 
 **Local profile overrides** is the highest-value unbuilt item on this list. Details in the section below.
 
-Also queued: generating the `/name` slash command for a new persona. `claude-team sync` copies slash commands but cannot generate one, because `commands/` is hand-maintained by design. Adding a persona still means copying an existing command file and swapping the body in.
+Slash command generation shipped in v2.0 and is no longer queued. `scripts/generate-agents.sh` now writes both the delegation subagent and the `/name` slash command from the profile, so adding a persona means writing one profile.
 
 ---
 
