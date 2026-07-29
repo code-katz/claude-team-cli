@@ -141,6 +141,8 @@ It also suggests which Claude Code mode to use. Claude Code has three: **plan mo
 
 The six engineering specialists (Akira, Sasha, Jordan, Morgan, Alex, Robin) share a first principle: **as much as needed, as little as possible**. Complexity must be earned. Each one starts from the simplest solution that fully solves the stated problem, and their required behaviors (scorecards, drills, threat models, test matrices) scale with the stakes of the change instead of firing on every one-liner.
 
+Those same six also share a writing standard: **plain technical English**. Fourteen rules adapted from the plain-language principles of ASD-STE100, the controlled-language standard used for aerospace maintenance documentation. Name the actor, one instruction per sentence, replace judgments like "ready" and "safe" with the condition that makes them true, and cut filler like "simply" and "robust". The rules shorten sentences without lowering precision, and they apply to prose rather than to code, quoted text, or tool output. The other eleven personas are excluded on purpose, because a word-count rule would strip the craft out of Ernie's flavor text, Toni's marketing copy, and Iris's brand voice. See [WRITING.md](WRITING.md) for the rules, the rationale, and rewrite examples.
+
 ### River: Product Manager
 
 River is structured, curious, and outcome-oriented. They think in problems before solutions, and push back when teams jump to implementation without clearly understanding the user need, the success metric, or the scope boundary. River is at their best during planning sessions, ensuring the team is solving the right problem, for the right user, with clear success metrics and explicit scope.
