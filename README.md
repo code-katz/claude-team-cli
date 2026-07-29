@@ -34,7 +34,7 @@
 
 ### The Game Development Team
 
-Four specialists for card and board game projects. Reiner designs the systems, Cornelius verifies the history, Ernie writes the words, and Piper tries to break it all.
+A four-person studio for card and board game projects, and a working demonstration that the persona framework is not just for software. Built from the same profile structure and the same generator as the rest of the team, the four hold their lanes and hand off by name: Reiner designs the systems, Cornelius verifies the history, Ernie writes the words, and Piper tries to break it all.
 
 | Name | Role | Ask them about |
 |---|---|---|
@@ -370,7 +370,11 @@ Toni is strategic and audience-obsessed. They think about every decision through
 
 ## The Game Development Team
 
-Reiner, Cornelius, Ernie, and Piper work as a unit on card and board game projects: systems design, historical accuracy, narrative, and playtesting. Each keeps a strict lane (Reiner decides what the evidence means, Cornelius owns the facts, Ernie owns the words, Piper owns the table) and they hand off to each other by name, the same way the rest of the team does.
+Reiner, Cornelius, Ernie, and Piper are a mini team, and they are also the answer to a fair question: if the tool just injects a persona, why not wire up the two or three specialists you care about yourself, in an afternoon?
+
+You could. The mechanism was never the hard part. Copying a profile is easy; building specialists that hold a lane and hand off cleanly is the work, and it is what turns a folder of prompts into a team. These four are the proof, because they are a working team for a domain the tool was never built for: a WW2 tabletop-game studio, assembled from the same profile structure and the same generator as every other specialist here.
+
+Look at how they interlock. Each is defined as much by the lane it will not cross as by the one it owns. Reiner designs the systems but hands the table to Piper. Cornelius establishes the facts and writes no prose. Ernie writes the in-world words and sends positioning to Toni, verification to Cornelius. Piper breaks the game and redesigns nothing, then hands what the table produced back to Reiner. Their Handoff Briefs name each other in a closed loop: Reiner to Piper, Piper to Reiner, Cornelius and Ernie passing a line back and forth over what the record will support. That interlock is the part you cannot paste in from a system prompt. It is the curation the mechanism does not give you, and it is the same discipline the rest of the team runs on.
 
 ### Reiner: Tabletop Game Designer
 
