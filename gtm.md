@@ -21,7 +21,7 @@ claude-team-cli is not a prompt library. It's not a collection of system prompts
 
 It's a named, opinionated specialist who shows up with domain expertise, asks the questions a senior practitioner would ask, and pushes back when something's off. Ten of them, covering the full product development lifecycle from discovery to launch.
 
-**One-line positioning:** *Your AI development team. Ten specialists, one CLI, zero meetings.*
+**One-line positioning:** *Your AI development team. Seventeen specialists, one CLI, zero meetings.*
 
 ### Differentiation Hook
 
@@ -206,7 +206,7 @@ The scenario is absurd enough to be memorable and complex enough to be real.
 
 ### Meet My Claude Dev Team
 
-**Ten specialists. One CLI. Zero meetings.**
+**Seventeen specialists. One CLI. Zero meetings.**
 
 ---
 
@@ -308,7 +308,7 @@ Switch mid-session without restarting:
 /morgan   /alex     /robin    /toni      /quinn
 ```
 
-Works on macOS and Linux. Requires Bash 3.2+ and Claude Code.
+Works on macOS and Linux. Requires Bash 4+ and Claude Code. macOS ships Bash 3.2, so run `brew install bash` first.
 
 **Bonus:** Two companion skills — [claude-devlog-skill](https://github.com/code-katz/claude-devlog-skill) and [claude-roadmap-skill](https://github.com/code-katz/claude-roadmap-skill) — give the team persistent memory. The devlog captures architectural decisions across sessions. The roadmap tracks priorities and records every reprioritization. Install both with two commands and your team doesn't just think differently — it *remembers* differently. More on these in a later post.
 
@@ -335,7 +335,7 @@ Same product, ten different specialists, and the tools that make sure none of it
 ### Post Body (paste directly into LinkedIn)
 
 ```
-I built a 10-person AI dev team inside Claude Code.
+I built a 17-person AI dev team inside Claude Code.
 
 Not prompt templates. A CLI that gives Claude named
 specialist personas — senior consultants with domain
@@ -413,7 +413,7 @@ What would you automate first?
 ```
 Repos:
 
-Team CLI (11 specialist personas):
+Team CLI (17 specialist personas):
 github.com/code-katz/claude-team-cli
 
 Companion skills:

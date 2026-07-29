@@ -298,10 +298,34 @@ get_active() {
 # destroy the user's file. The lock covers the whole read-modify-write. Two
 # sessions writing different blocks of the same file otherwise lose one of
 # them, or each fail to see the other's marker and append a second copy.
+# Refuse to rewrite a file whose marker pair is damaged. block_install and
+# block_remove both locate the block by scanning for START and END; if END is
+# missing, both delete everything from START to end of file, which is the user's
+# own content on a file they are told to hand-edit. Reproduced: a CLAUDE.md with
+# a lost END marker lost a personal runbook to 'claude-team use', exit 0.
+#
+# Substring matching is why a bare count is the right check: a line merely
+# mentioning the marker inside the user's prose is indistinguishable from the
+# marker itself, so two STARTs is equally unsafe to rewrite blind.
+block_assert_sane() {
+  local file="$1" start="$2" end="$3" label="$4" starts ends
+  [[ -f "$file" ]] || return 0
+  starts=$(grep -cF "$start" "$file" || true)
+  ends=$(grep -cF "$end" "$file" || true)
+  [[ "$starts" == "$ends" && "$starts" -le 1 ]] && return 0
+  die "The $label markers in $file are damaged: $starts start, $ends end (expected one of each, or none).
+Refusing to rewrite, because repairing this automatically would guess at which
+of your own lines belong inside the block. Fix the markers by hand, or delete
+the block entirely, then rerun. The markers are:
+  $start
+  $end"
+}
+
 block_install() {
   local file="$1" start="$2" end="$3" content="$4"
   lock_acquire "$file"
   touch "$file"
+  block_assert_sane "$file" "$start" "$end" "block"
   local tmp
   tmp=$(tmp_beside "$file")
   if grep -qF "$start" "$file"; then
@@ -324,6 +348,7 @@ block_install() {
 block_remove() {
   local file="$1" start="$2" end="$3"
   lock_acquire "$file"
+  block_assert_sane "$file" "$start" "$end" "block"
   local tmp
   tmp=$(tmp_beside "$file")
   awk -v s="$start" -v e="$end" '
@@ -616,6 +641,20 @@ get_active_branch() {
 
 # ─── Branch commands ──────────────────────────────────────────────────────────
 
+# The branch index is a pipe-delimited table read back with awk -F'|', so a
+# literal '|' in any field shifts every column after it. Nothing rejected one,
+# and git itself accepts a '|' in a ref name, so 'branch start feat/a|b' or a
+# plan slug like "sprint-42 | scoped" printed a success line and then wrote a
+# row the tool could never read back: status reported none, done could not close
+# it, and the row stayed active forever. Rejecting at the two write sites is
+# cheaper and safer than making every reader robust to a broken row.
+assert_index_safe() {
+  local value="$1" label="$2"
+  [[ "$value" != *"|"* ]] || die "The $label may not contain '|': $value
+The branch index is a pipe-delimited table, so that character would corrupt the
+row and the entry could not be read back. Use a different separator."
+}
+
 cmd_branch_start() {
   [[ $# -ge 1 ]] || die "Usage: claude-team branch start <branch-name> [--plan <slug>]"
   local branch_name="$1"
@@ -648,6 +687,10 @@ Run 'claude-team branch done' or 'claude-team branch abandon' before starting a 
   fi
 
   ensure_branches_index
+
+  assert_index_safe "$branch_name" "branch name"
+  assert_index_safe "$plan_slug" "plan slug"
+  assert_index_safe "$project" "project name"
 
   local today
   today=$(date '+%Y-%m-%d')
@@ -948,6 +991,11 @@ cmd_session_start() {
     esac
   done
 
+  # Fail before creating a worktree, not after: a rejected row here would
+  # otherwise leave an unregistered worktree on disk.
+  assert_index_safe "$branch_name" "branch name"
+  assert_index_safe "$plan_slug" "plan slug"
+
   local repo_root project worktree_path
   repo_root=$(git rev-parse --show-toplevel 2>/dev/null) \
     || die "Not in a git repo. Run this from your project's root directory."
@@ -1057,13 +1105,23 @@ Run this from inside a session worktree, or use 'claude-team branch done' for no
   # that had not been git added yet was deleted below with no warning and a
   # zero exit. A file you have written but not staged is the most ordinary
   # state in a working session, so that was the common case, not an edge one.
+  # --ignored is not optional. Plain --porcelain omits ignored files, and
+  # 'git worktree remove' deletes them, so without it a .env holding the only
+  # copy of a credential was destroyed with a zero exit. A file is gitignored
+  # because it is generated or because it is secret, and the second kind exists
+  # nowhere else.
+  # .claude-session is excluded because this command created it: session start
+  # writes the marker and adds it to info/exclude, so it shows up as ignored in
+  # every worktree and would otherwise block every close. It is the one ignored
+  # path the tool owns and is meant to remove.
   local dirty
-  dirty=$(git -C "$worktree_path" status --porcelain 2>/dev/null)
+  dirty=$(git -C "$worktree_path" status --porcelain --ignored 2>/dev/null \
+    | grep -v '^!! \.claude-session$' || true)
   if [[ -n "$dirty" ]]; then
     echo "$(red "⚠") Worktree still has uncommitted work:" >&2
     printf '%s\n' "$dirty" | sed 's/^/    /' >&2
     echo "  Commit it, stash it, or delete the files, then close the session." >&2
-    echo "  $(dim "Untracked files count: they are not in any commit and would be lost.")" >&2
+    echo "  $(dim "'??' is untracked and '!!' is ignored. Neither is in any commit.")" >&2
     exit 1
   fi
 
@@ -1092,8 +1150,20 @@ Run this from inside a session worktree, or use 'claude-team branch done' for no
       print
     }
   ' "$BRANCHES_INDEX" > "$tmp" || die "Failed to rewrite the branch index: $BRANCHES_INDEX"
+  # An unchanged file means the awk matched no row, so the session is about to
+  # be closed while the index still calls it active. Say so: silence here is
+  # what turns a malformed row into a success message and a permanent ghost
+  # entry. The worktree removal below is still what the user asked for.
+  # An 'if', not 'cmp && assign': the files differ in the normal case, so the
+  # && list would return non-zero and set -e would kill the function here.
+  local index_unchanged=false
+  if cmp -s "$tmp" "$BRANCHES_INDEX"; then index_unchanged=true; fi
   tmp_commit "$tmp" "$BRANCHES_INDEX"
   lock_release
+  if [[ "$index_unchanged" == true ]]; then
+    echo "$(yellow "!") No active index row matched '$branch' for '$project', so nothing was marked merged." >&2
+    echo "  $(dim "Closing the worktree anyway. Check: claude-team branch list")" >&2
+  fi
 
   # Remove the worktree (git requires this from outside it). No --force
   # fallback: git refuses to remove a worktree holding modified or untracked

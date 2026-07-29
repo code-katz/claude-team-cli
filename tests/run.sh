@@ -42,6 +42,14 @@ run_cmd() {
   CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" "$@"
 }
 
+# The branch section needs a git repo to work in. A separate helper rather than
+# a mid-file redefinition of run_cmd: redefining a function trips shellcheck
+# (SC2218) and makes every earlier call ambiguous to a human reader too.
+# $BRANCH_REPO is set by that section before anything calls this.
+run_branch() {
+  (cd "$BRANCH_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" "$@")
+}
+
 # ─── Assertion helpers ───────────────────────────────────────────────────────
 
 ok()   { PASS=$((PASS + 1)); printf "  \033[32m✓\033[0m %s\n" "$1"; }
@@ -309,7 +317,8 @@ echo ""
 # it hardcodes the real PROFILES_DIR, and this needs a missing one instead.
 echo "profiles directory entirely missing"
 
-NO_PROFILES="$(mktemp -d)/does-not-exist"
+NO_PROFILES_BASE=$(mktemp -d)
+NO_PROFILES="$NO_PROFILES_BASE/does-not-exist"
 NOPROF_HOME=$(mktemp -d)
 if CLAUDE_TEAM_PROFILES="$NO_PROFILES" HOME="$NOPROF_HOME" "$CLI" list >/dev/null 2>&1; then
   fail "list fails safely when the profiles dir is missing"
@@ -333,7 +342,7 @@ else
 fi
 assert_file_lacks "a failed use writes nothing to CLAUDE.md when the profiles dir is missing" \
   "$NOPROF_HOME/.claude/CLAUDE.md" "CLAUDE-TEAM:START"
-rm -rf "$NOPROF_HOME"
+rm -rf "$NOPROF_HOME" "$NO_PROFILES_BASE"
 echo ""
 
 # content preservation: use/reset and coordinator on/off must round-trip the
@@ -407,45 +416,60 @@ echo "branch commands"
 
 BRANCHES_INDEX="$TEST_HOME/.claude/branches/INDEX.md"
 
+# Own fixture, like every other git-touching section. This block used to run
+# against the ambient CWD and assert the literal string "claude-team-cli" as the
+# project name, so it failed in a differently-named clone and failed ten ways
+# when the suite was run from outside a git repo at all. Both are ordinary:
+# 'claude-team session start' puts contributors in a worktree named for the
+# branch, not the repo.
+BRANCH_REPO=$(mktemp -d)
+BRANCH_PROJECT=$(basename "$BRANCH_REPO")
+git init -q "$BRANCH_REPO"
+git -C "$BRANCH_REPO" commit -q --allow-empty -m init
+
 # status warns when no index exists
-out=$(run_cmd branch status 2>&1)
+out=$(run_branch branch status 2>&1)
 assert_contains "branch status warns when no active branch" "none|No branch|no active|No active" "$out"
 
 # start registers a branch
-run_cmd branch start feat/test-branch >/dev/null
+run_branch branch start feat/test-branch >/dev/null
 assert_file_has "branch start creates index"            "$BRANCHES_INDEX" "Branch Index"
 assert_file_has "branch start writes branch name"       "$BRANCHES_INDEX" "feat/test-branch"
-assert_file_has "branch start writes project name"      "$BRANCHES_INDEX" "claude-team-cli"
+assert_file_has "branch start writes project name"      "$BRANCHES_INDEX" "$BRANCH_PROJECT"
 assert_file_has "branch start writes active status"     "$BRANCHES_INDEX" "active"
 
 # status shows active branch
-out=$(run_cmd branch status)
+out=$(run_branch branch status)
 assert_contains "branch status shows active branch"     "feat/test-branch" "$out"
 
 # start blocked when active already exists
-assert_exits_nonzero "branch start blocked when active exists" "$CLI" branch start feat/duplicate
+if (cd "$BRANCH_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" branch start feat/duplicate >/dev/null 2>&1); then
+  fail "branch start blocked when active exists"
+else
+  ok "branch start blocked when active exists"
+fi
 
 # done marks merged
-out=$(run_cmd branch "done" 2>&1)
+out=$(run_branch branch "done" 2>&1)
 assert_contains "branch done output mentions merged"    "merged" "$out"
 assert_file_has "branch done updates status in index"   "$BRANCHES_INDEX" "merged"
 
 # status after done shows none
-out=$(run_cmd branch status 2>&1)
+out=$(run_branch branch status 2>&1)
 assert_contains "branch status after done shows none"   "none|No branch|no active|No active" "$out"
 
 # start with --plan links a plan slug
-run_cmd branch start feat/with-plan --plan some-plan-slug >/dev/null
+run_branch branch start feat/with-plan --plan some-plan-slug >/dev/null
 assert_file_has "branch start --plan writes plan slug"  "$BRANCHES_INDEX" "some-plan-slug"
 
 # abandon marks abandoned
-out=$(run_cmd branch abandon 2>&1)
+out=$(run_branch branch abandon 2>&1)
 assert_contains "branch abandon output mentions abandoned" "abandoned" "$out"
 assert_file_has "branch abandon updates status in index"  "$BRANCHES_INDEX" "abandoned"
 
 # list shows full table
-run_cmd branch start feat/listable >/dev/null
-out=$(run_cmd branch list 2>&1)
+run_branch branch start feat/listable >/dev/null
+out=$(run_branch branch list 2>&1)
 assert_contains "branch list shows header"              "Branch Index" "$out"
 assert_contains "branch list shows branch entry"        "feat/listable" "$out"
 
@@ -483,6 +507,8 @@ fi
 rm -f "$_foreign_hook_src"
 rm -rf "$GUARD_REPO"
 echo ""
+
+rm -rf "$BRANCH_REPO"
 
 # session commands
 echo "session commands"
@@ -618,6 +644,41 @@ if [[ -d "$STAGED_WT" ]]; then ok "worktree survives a refused session done (sta
 else fail "worktree survives a refused session done (staged new file)"; fi
 rm -rf "$STAGED_REPO"
 
+# Gitignored file. The first fix for this bug used plain --porcelain, which
+# omits ignored files, and 'git worktree remove' deletes them. A .env is
+# gitignored precisely because it is secret, so it exists nowhere else. The fix
+# moved the bug from untracked to ignored rather than closing the class.
+IGN_REPO=$(mktemp -d)
+git init -q "$IGN_REPO"
+printf '.env\n' > "$IGN_REPO/.gitignore"
+git -C "$IGN_REPO" add .gitignore
+git -C "$IGN_REPO" commit -q -m init
+(cd "$IGN_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/ignored >/dev/null 2>&1)
+IGN_WT="$SESSION_WORKTREES/$(basename "$IGN_REPO")/feat-ignored"
+printf 'SECRET_DB_PASSWORD=hunter2\n' > "$IGN_WT/.env"
+if (cd "$IGN_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" >/dev/null 2>&1); then
+  fail "session done refuses a gitignored file"
+else
+  ok "session done refuses a gitignored file"
+fi
+if [[ -f "$IGN_WT/.env" ]]; then ok "a gitignored secret survives a refused session done"
+else fail "a gitignored secret survives a refused session done (THE FILE WAS DELETED)"; fi
+rm -rf "$IGN_REPO"
+
+# The tool's own .claude-session marker is gitignored in every worktree, so the
+# --ignored guard must exempt it or no session could ever be closed.
+CLEAN_REPO=$(mktemp -d)
+git init -q "$CLEAN_REPO"
+git -C "$CLEAN_REPO" commit -q --allow-empty -m init
+(cd "$CLEAN_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/clean >/dev/null 2>&1)
+CLEAN_WT="$SESSION_WORKTREES/$(basename "$CLEAN_REPO")/feat-clean"
+if (cd "$CLEAN_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" >/dev/null 2>&1); then
+  ok "a clean worktree still closes despite its ignored marker"
+else
+  fail "a clean worktree still closes despite its ignored marker"
+fi
+rm -rf "$CLEAN_REPO"
+
 # Untracked new file. This is the case that lost data: 'git diff' and 'git diff
 # --cached' are both blind to a file that was never added, so it passed the
 # guard, and the '|| ... --force' fallback then overrode git's own refusal to
@@ -644,6 +705,72 @@ else fail "worktree survives a refused session done (untracked new file)"; fi
 out=$( (cd "$UNTRACKED_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" 2>&1) || true)
 assert_contains "the refusal names the untracked file" "untracked.txt" "$out"
 rm -rf "$UNTRACKED_REPO"
+echo ""
+
+# A '|' in any indexed field shifts every awk column after it, so the tool wrote
+# rows it could never read back: status said none, done could not close them,
+# and session done printed success while the row stayed active forever. git
+# itself accepts '|' in a ref name, and "sprint-42 | scoped" is an ordinary plan
+# slug, so this needed no adversary.
+echo "index delimiter safety"
+PIPE_REPO=$(mktemp -d)
+git init -q "$PIPE_REPO"
+git -C "$PIPE_REPO" commit -q --allow-empty -m init
+if (cd "$PIPE_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" branch start 'feat/a|b' >/dev/null 2>&1); then
+  fail "branch start rejects a pipe in the branch name"
+else
+  ok "branch start rejects a pipe in the branch name"
+fi
+if (cd "$PIPE_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" branch start feat/ok --plan 'sprint | scoped' >/dev/null 2>&1); then
+  fail "branch start rejects a pipe in the plan slug"
+else
+  ok "branch start rejects a pipe in the plan slug"
+fi
+if (cd "$PIPE_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start 'feat/c|d' >/dev/null 2>&1); then
+  fail "session start rejects a pipe in the branch name"
+else
+  ok "session start rejects a pipe in the branch name"
+fi
+# The rejection must happen before any worktree is created.
+if [[ -z "$(find "$TEST_HOME/.claude/worktrees" -name 'feat-c*' 2>/dev/null)" ]]; then
+  ok "a rejected session name leaves no orphan worktree"
+else fail "a rejected session name leaves no orphan worktree"; fi
+# A registered branch must still be readable back, which is what pipes broke.
+(cd "$PIPE_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" branch start feat/readable >/dev/null 2>&1)
+out=$( (cd "$PIPE_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" branch status) 2>&1)
+assert_contains "a registered branch reads back from the index" "feat/readable" "$out"
+rm -rf "$PIPE_REPO"
+echo ""
+
+# CLAUDE.md is a file the user is told to hand-edit, so its markers get damaged.
+# block_install and block_remove both locate the block by scanning for START
+# then END; with END missing they deleted everything from START to end of file,
+# which is the user's own content, at exit 0.
+echo "damaged marker blocks"
+DMG_HOME=$(mktemp -d)
+mkdir -p "$DMG_HOME/.claude"
+printf '<!-- CLAUDE-TEAM:START -->\nstale block, END lost\n# my runbook\n- step one\n' > "$DMG_HOME/.claude/CLAUDE.md"
+if CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$DMG_HOME" "$CLI" use akira >/dev/null 2>&1; then
+  fail "use refuses a file with an unbalanced marker pair"
+else
+  ok "use refuses a file with an unbalanced marker pair"
+fi
+assert_file_has "user content below a damaged block survives" "$DMG_HOME/.claude/CLAUDE.md" "step one"
+if CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$DMG_HOME" "$CLI" reset >/dev/null 2>&1; then
+  fail "reset refuses a file with an unbalanced marker pair"
+else
+  ok "reset refuses a file with an unbalanced marker pair"
+fi
+assert_file_has "user content survives a refused reset" "$DMG_HOME/.claude/CLAUDE.md" "step one"
+# Two STARTs is equally unsafe: matching is a substring test, so a marker quoted
+# in the user's own prose is indistinguishable from the real one.
+printf '<!-- CLAUDE-TEAM:START -->\nA\n<!-- CLAUDE-TEAM:END -->\n<!-- CLAUDE-TEAM:START -->\nB\n<!-- CLAUDE-TEAM:END -->\n' > "$DMG_HOME/.claude/CLAUDE.md"
+if CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$DMG_HOME" "$CLI" use akira >/dev/null 2>&1; then
+  fail "use refuses a file with duplicated marker pairs"
+else
+  ok "use refuses a file with duplicated marker pairs"
+fi
+rm -rf "$DMG_HOME"
 echo ""
 
 # Shared-state concurrency. ~/.claude/branches/INDEX.md and ~/.claude/CLAUDE.md
@@ -855,6 +982,23 @@ agent_count=${#agent_files[@]}
 [[ -e "${agent_files[0]}" ]] || agent_count=0
 if [[ "$agent_count" == "$PERSONA_COUNT" ]]; then ok "every persona has a generated subagent"
 else fail "every persona has a generated subagent (expected $PERSONA_COUNT, got $agent_count)"; fi
+# description: is the field Claude Code reads to pick a subagent for automatic
+# delegation. Collapsing it to one identical string across all seventeen would
+# silently disable meaningful delegation, and a regenerate-and-diff check cannot
+# see it: the generator would agree with itself. Only a content assertion can.
+descdrift=""
+while IFS=$'\t' read -r slug display _role; do
+  grep -q "^description: $display," "$REPO_DIR/agents/$slug.md" || descdrift="$descdrift $slug"
+done < <(
+  for _pf in "$REPO_DIR"/profiles/*.md; do
+    _sl=$(basename "$_pf" .md)
+    case "$_sl" in coordinator*) continue ;; esac
+    _ti=$(grep -m1 '^# ' "$_pf" | sed 's/^# //')
+    printf '%s\t%s\t%s\n' "$_sl" "${_ti%% —*}" "${_ti#*— }"
+  done
+)
+if [[ -z "$descdrift" ]]; then ok "each subagent description names its own persona"
+else fail "each subagent description names its own persona (wrong:$descdrift)"; fi
 assert_contains "akira agent carries model tier" "model: claude-fable-5" "$(cat "$REPO_DIR/agents/akira.md")"
 assert_contains "iris agent carries model tier" "model: claude-opus-4-8" "$(cat "$REPO_DIR/agents/iris.md")"
 assert_contains "agents marked as generated" "GENERATED from profiles" "$(cat "$REPO_DIR/agents/robin.md")"
