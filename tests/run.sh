@@ -621,14 +621,15 @@ else fail "generated agents match their profiles (stale:$stale)"; fi
 # profile: Required Interactive Behaviors excised, and the ## Greeting heading
 # replaced by its sentence as the trailer. So every non-blank profile line outside
 # those two sections, plus the greeting sentence, must appear verbatim in the
-# slash command.
+# slash command. The excised range ends at ## Handoff Brief, not ## Signature
+# Question, so the brief survives; this awk must track the stripper exactly.
 cdrift=""
 for profile in "$REPO_DIR"/profiles/*.md; do
   pname=$(basename "$profile" .md)
   case "$pname" in coordinator*) continue ;; esac
   cmd="$REPO_DIR/commands/$pname.md"
   if [[ ! -f "$cmd" ]]; then cdrift="$cdrift $pname(no-command)"; continue; fi
-  d=$(awk '/^## Required Interactive Behaviors$/{skip=1} /^## Signature Question$/{skip=0}
+  d=$(awk '/^## Required Interactive Behaviors$/{skip=1} /^## Handoff Brief$/{skip=0}
            /^## Greeting$/{next} !skip' "$profile" \
       | grep -v '^[[:space:]]*$' | grep -F -x -v -c -f "$cmd" - || true)
   [[ "$d" == "0" ]] || cdrift="$cdrift $pname($d)"
@@ -643,6 +644,35 @@ if grep -q '^## Greeting$' "$REPO_DIR"/agents/*.md; then
 else
   ok "greeting excluded from generated agents"
 fi
+
+# The coordinator tells a user to run /<name> at the moment of a handoff, then
+# asks that persona for a Handoff Brief. For years the brief lived inside
+# Required Interactive Behaviors, which the slash command excises, so the
+# persona being asked had never been told what one is. All four delivery
+# surfaces must carry it.
+hcount=$(grep -l '^## Handoff Brief$' "$REPO_DIR"/commands/*.md 2>/dev/null | wc -l | tr -d ' ')
+assert_count_eq() { if [[ "$2" == "$3" ]]; then ok "$1"; else fail "$1 (expected $3, got $2)"; fi; }
+assert_count_eq "every slash command carries the handoff brief" "$hcount" "17"
+hcount=$(grep -l '^## Handoff Brief$' "$REPO_DIR"/agents/*.md 2>/dev/null | wc -l | tr -d ' ')
+assert_count_eq "every subagent still carries the handoff brief" "$hcount" "17"
+hcount=$(grep -l '^## Handoff Brief$' "$REPO_DIR"/profiles/*.md 2>/dev/null | wc -l | tr -d ' ')
+assert_count_eq "every persona profile defines a handoff brief" "$hcount" "17"
+run_cmd use akira >/dev/null 2>&1
+assert_file_has "use carries the handoff brief into the global pin" "$CLAUDE_MD" "^## Handoff Brief"
+run_cmd reset >/dev/null 2>&1
+
+# A profile with no ## Handoff Brief would leave the stripper skipping to EOF,
+# silently dropping every later section from the slash command. Generation must
+# stop instead.
+HB_REPO=$(mktemp -d)
+cp -R "$REPO_DIR"/profiles "$REPO_DIR"/scripts "$HB_REPO/"
+sed -i.bak '/^## Handoff Brief$/d' "$HB_REPO/profiles/akira.md" && rm -f "$HB_REPO/profiles/akira.md.bak"
+if bash "$HB_REPO/scripts/generate-agents.sh" >/dev/null 2>&1; then
+  fail "generator refuses a profile with no handoff brief"
+else
+  ok "generator refuses a profile with no handoff brief"
+fi
+rm -rf "$HB_REPO"
 
 # team-session-start hook behavior
 HOOK="$REPO_DIR/bin/team-session-start"

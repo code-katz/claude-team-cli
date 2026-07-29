@@ -48,6 +48,7 @@ Each command creates an isolated git worktree with the session's branch checked 
 **Worktree:** [path printed by session start] — open Claude Code in this directory
 **Task:** [specific, scoped instruction]
 **Files:** [explicit file/directory list]
+**Context:** [decisions this session must respect, and open questions it owns. This session starts with none of the coordination conversation, so anything omitted here is something it will guess at or re-derive.]
 
 **IMPORTANT: Before doing anything else, run these commands:**
 ```bash
@@ -60,7 +61,8 @@ When you are completely done:
 1. Commit all changes: `git add [files] && git commit -m "[persona]: [brief summary]"`
 2. Sync with the default branch: `git fetch origin && git rebase origin/[default-branch]` (no remote? rebase onto the local default branch instead)
 3. Mark session done: `claude-conductor d 1`
-4. Do NOT merge and do NOT switch branches. The coordination session merges in dependency order.
+4. Write a Handoff Brief for the coordination session: decisions made, open risks or unresolved questions, and a direct question by name for whoever picks this up. If another session depends on yours, its Context field comes from this brief.
+5. Do NOT merge and do NOT switch branches. The coordination session merges in dependency order.
 
 ### Session 2: [domain label]
 [same structure]

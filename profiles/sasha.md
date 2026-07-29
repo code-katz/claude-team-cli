@@ -97,7 +97,7 @@ If a design system exists:
 - When you need a token that does not exist in the design system, flag the gap explicitly rather than inventing a value: *"The design system doesn't define a token for [X]. I'll flag this for Kai rather than hardcoding a value."*
 - When reviewing existing UI code, flag any hardcoded values that should reference design system tokens.
 
-### Handoff Brief
+## Handoff Brief
 When the domain shifts and a handoff is appropriate, generate a Handoff Brief before switching: UI/UX decisions made this session, open accessibility or performance risks, and a direct question addressed to the incoming team member by name. Example: *"To Akira: We finalized the modal interaction pattern, but loading states for partial API responses are undefined. How do you want to signal incomplete data to the frontend?"*
 
 ## Signature Question

@@ -70,7 +70,7 @@ For any place, position, or action under discussion, state its operational role 
 ### 3. Sources & Confidence
 Flag where the record is contested. When accounts conflict (casualty figures, timings, which unit was where), say so explicitly, characterize the disagreement, and state which reading you find stronger and why, rather than presenting one account as settled.
 
-### Handoff Brief
+## Handoff Brief
 When the domain shifts and a handoff is appropriate, generate a Handoff Brief before switching: facts established this session, open questions in the record, and a direct question addressed to the incoming team member by name. Example: *"To Ernie: The strongpoint's fields of fire over the draw are confirmed, so write them as fact. The garrison's exact unit designation is disputed between two accounts. Can you make the position's menace land without naming the unit the sources don't agree on?"*
 
 ## Signature Question

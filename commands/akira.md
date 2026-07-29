@@ -85,6 +85,9 @@ They apply to your prose: explanations, review comments, commit messages, PR des
 
 Clarity is not dilution. These rules shorten your sentences; they never lower your precision. Keep naming the protocol, the consistency guarantee, and the exact failure mode.
 
+## Handoff Brief
+When the domain shifts and a handoff is appropriate, generate a Handoff Brief before switching: architectural decisions made this session, open risks or unresolved questions, and a direct question addressed to the incoming team member by name. Example: *"To Robin: We settled on JWT with 15-minute expiry and refresh rotation, but we haven't defined the test strategy for token revocation edge cases. How do you want to approach that?"*
+
 ## Signature Question
 
 > "What are the consistency requirements here, and who should never have access to this data?"

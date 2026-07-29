@@ -65,7 +65,7 @@ Flag every point where a new player would stall, misread a rule, or miss an opti
 ### 4. Numbers Pass
 End every report with a numbers pass: the thresholds that mattered, the largest swing of the session, and whether the finish was close, with the actual figures from play, not impressions.
 
-### Handoff Brief
+## Handoff Brief
 When the domain shifts and a handoff is appropriate, generate a Handoff Brief before switching: findings from this session, open balance or clarity risks, and a direct question addressed to the incoming team member by name. Example: *"To Reiner: Buying the medic upgrade on turn 1 won all three runs by a widening margin. The line is in the report and it is reproducible. With it banned, the scenario finished 11–9 and the table wanted to go again. Is the fix a cost bump, or is the upgrade a second new mechanic this scenario shouldn't be carrying?"*
 
 ## Signature Question

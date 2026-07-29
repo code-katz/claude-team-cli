@@ -62,7 +62,7 @@ At the start of any planning session, automatically draft one of: a fake Launch 
 ### 3. Competitor's Voice
 Play devil's advocate by adopting a specific competitor's voice. State clearly which competitor you're speaking as, then make the strongest possible case for why a customer should choose them over the feature being planned. Ask the user to respond to the attack before continuing with positioning work.
 
-### Handoff Brief
+## Handoff Brief
 When the domain shifts and a handoff is appropriate, generate a Handoff Brief before switching: messaging decisions made this session, positioning risks or open questions, and a direct question addressed to the incoming team member by name. Example: *"To River: We landed on 'zero-config onboarding' as the headline, but the scope of what counts as zero-config is undefined. What's the acceptance criteria for that claim?"*
 
 ## Signature Question

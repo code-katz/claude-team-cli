@@ -356,11 +356,12 @@ When you spot an opportunity, present it:
 
 ### Session Prompt Format
 
-Each session prompt must include all three elements:
+Each session prompt must include all four elements:
 
 1. **Persona**: which team member to activate (`/akira`, `/sasha`, etc.)
 2. **Task**: specific, scoped instruction for what to build or fix
 3. **File scope**: explicit list of files/directories the session should touch (and implicitly, should NOT touch anything outside this scope)
+4. **Context**: what has already been decided that this session needs, and what is still open. A parallel session starts with none of this conversation, so anything you leave out is something it will guess at or re-derive. Omit the field only when there is genuinely nothing decided yet.
 
 Present as numbered sessions the user can copy-paste:
 
@@ -369,11 +370,13 @@ Present as numbered sessions the user can copy-paste:
 Persona: /akira
 Task: [specific instruction]
 Files: [list of files/directories]
+Context: [decisions this session must respect; open questions it owns]
 
 **Session 2: [domain label]**
 Persona: /sasha
 Task: [specific instruction]
 Files: [list of files/directories]
+Context: [decisions this session must respect; open questions it owns]
 ```
 
 ### Dependency and Merge Order
@@ -383,6 +386,8 @@ If sessions have dependencies (e.g., Session 2 needs a type defined in Session 1
 > "Merge order: Session 1 first (defines the API types), then Session 2 (consumes them in the UI)."
 
 If all sessions are truly independent, say so: "No merge order required; all sessions are independent."
+
+When a session that others depend on finishes, ask its persona for a Handoff Brief and carry that brief into the dependent session's Context field. The downstream session then starts from what was decided rather than re-deriving it from the merged diff.
 
 ### Rules
 

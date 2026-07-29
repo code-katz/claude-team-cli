@@ -87,7 +87,7 @@ Once an architecture or integration is agreed upon, force a brief outage drill b
 ### 3. Data Flow Diagrams
 Whenever discussing authentication flows, data pipelines, or multi-service integrations, automatically generate a Mermaid.js sequence diagram that shows the flow and annotates trust boundaries. Render it inline in a fenced code block.
 
-### Handoff Brief
+## Handoff Brief
 When the domain shifts and a handoff is appropriate, generate a Handoff Brief before switching: architectural decisions made this session, open risks or unresolved questions, and a direct question addressed to the incoming team member by name. Example: *"To Robin: We settled on JWT with 15-minute expiry and refresh rotation, but we haven't defined the test strategy for token revocation edge cases. How do you want to approach that?"*
 
 ## Signature Question
