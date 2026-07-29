@@ -5,6 +5,51 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-29] Two stale promises: a customization layer that should not exist, and a feature that already did
+
+**Category:** `decision`
+**Tags:** `roadmap`, `docs`, `handoff`, `codegen`, `messaging`, `dogfooding`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+PRs #23 and #24 close the same kind of gap from opposite directions: the documentation described a product that did not match the code. #23 removed a promise that should never be kept. #24 found a shipped feature listed as unbuilt, and fixed the one surface where it failed to arrive. The suite went 163 to 175.
+
+### Detail
+
+**Local profile overrides were retired rather than deferred.** They had been the top unbuilt roadmap item since v2 planning. The reasoning that killed them came from the product owner and is worth preserving verbatim in spirit: an override layer creates a second source of persona truth competing with the repo, and no reliable way to tell whether Akira is behaving like upstream Akira or like a local edit. Team-scoped profiles, the same layer at project scope via `claude-team init` and `.claude-team/`, went for the same reason. The supported paths are the two that already existed, a pull request or a fork, and `CONTRIBUTING.md` now documents both along with persona authoring.
+
+**The installer was overstating what it had activated, and the first diagnosis was wrong.** The claim was that it advertised subagents as ready to delegate to. That message had been deleted by `cbbb7a4` when `install.sh` began delegating to `claude-team sync`. The real defect was silence. Claude Code registers subagents and hooks when a session starts and reads slash commands on demand, so a sync activates one of three surfaces immediately. Nothing said so, three green checkmarks in a row read as three live capabilities, and `install.sh` closed with "Your Claude dev team is ready." The SessionStart hook had the starkest form of it, printing a bare checkmark for something that cannot by definition fire in the session that registers it.
+
+**Session handoff briefing was listed as aspirational and had shipped with the personas.** All seventeen carried a Handoff Brief section with byte-identical opening and closing stems; both coordinator profiles instructed the coordinator to ask for one at a switch; three earlier DEVLOG entries treat "3 behaviors + handoff" as a structural invariant. The roadmap entry had been written by paraphrasing the already-shipped `robin.md` text.
+
+**The defect was delivery, and it landed on the worst surface available.** `### Handoff Brief` sat inside `## Required Interactive Behaviors`, which `strip_interactive_behaviors` excises from every slash command: 17 of 17 subagents carried it, 0 of 17 slash commands did. `coordinator.md:126` tells the user to run `/<name>` at the exact moment of a handoff, and `:128` then tells the coordinator to ask that persona for a brief. The asker had the instruction. The answerer, on the path the coordinator itself recommends, had never been told what a Handoff Brief is.
+
+**A test asserted the bug as correct.** The commands drift check mirrored the stripper's awk exactly, so the absence was not an oversight that slipped through review; it was pinned in place by CI. This is the third defect in two days where a green suite protected the wrong behavior, after the hook tests that passed while the hook never installed, and the three-copy persona problem that produced no error.
+
+### Decisions Made
+
+- **The heading was promoted rather than the stripper made cleverer.** `### Handoff Brief` became `## Handoff Brief`, and the stripper's end marker moved from `## Signature Question` to it. This codifies what the structure already implied: the section was deliberately unnumbered while its siblings are `### 1.`, `### 2.`, `### 3.`
+- **The generator now refuses a profile with no `## Handoff Brief`.** The stripper resets its skip flag on that marker, so a profile lacking it would silently drop every later section from the slash command. The identical latent failure exists with `## Signature Question` and goes unnoticed only because all seventeen happen to have one.
+- **Handoffs stay prompt-only.** No file, no command, no stored state. This keeps the feature clear of the shared-state locking the branch index needed, and it was the product owner's explicit call.
+- **Parallel session prompts gained a fourth Context field.** They carried Persona, Task, and File scope, so every session re-derived context it was never given. A finished session with dependents now writes a brief that becomes the downstream Context.
+- **Dated history is never rewritten.** The roadmap row promoting overrides to top priority stays verbatim; new rows record the retirement and the correction.
+
+### Mistakes Worth Recording
+
+- **A control test passed for the wrong reason.** Proving the traversal tests were meaningful required running them against pre-fix code, but the scratch tree was missing `gtm.md`, so the traversal resolved to nothing and every assertion passed against unfixed code. The suite now asserts the traversal target exists before testing against it. The same mistake nearly recurred on the handoff control.
+- **The installer diagnosis was wrong in its specifics** and was corrected in the PR body rather than quietly restated. The message being blamed had been deleted three commits earlier.
+
+### Related
+
+- PR #23, PR #24
+- `CONTRIBUTING.md`: the supported customization paths and persona authoring
+- ROADMAP: the aspirational list is now empty, two items retired and one found already shipped
+
+---
+
 ## [2026-07-29] v2 hardening: four specialists, a real race, and a lint I broke
 
 **Category:** `milestone`
