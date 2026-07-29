@@ -20,10 +20,6 @@ if [[ -z "${BASH_VERSINFO:-}" ]] || (( BASH_VERSINFO[0] < 4 )); then
 fi
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROFILES_SRC="$REPO_DIR/profiles"
-PROFILES_DST="$HOME/.claude/team"
-COMMANDS_SRC="$REPO_DIR/commands"
-COMMANDS_DST="$HOME/.claude/commands"
 BIN_SRC="$REPO_DIR/bin/claude-team"
 BIN_DST="$HOME/.local/bin/claude-team"
 BRANCHES_INDEX="$HOME/.claude/branches/INDEX.md"
@@ -39,45 +35,20 @@ echo "$(bold "claude-team-cli installer")"
 echo "────────────────────────────────────"
 echo ""
 
-# 1. Install profiles (+ model tiers)
-echo "Installing profiles to $PROFILES_DST ..."
-mkdir -p "$PROFILES_DST"
-cp "$PROFILES_SRC"/*.md "$PROFILES_DST/"
-if [[ -f "$PROFILES_SRC/tiers.conf" ]]; then cp "$PROFILES_SRC/tiers.conf" "$PROFILES_DST/"; fi
-echo "$(green "✓") Profiles installed:"
-for f in "$PROFILES_DST"/*.md; do
-  echo "    $(dim "$f")"
-done
-echo ""
-
-# 1b. Install delegation subagents
-AGENTS_SRC="$REPO_DIR/agents"
-AGENTS_DST="$HOME/.claude/agents"
-if [[ -d "$AGENTS_SRC" ]]; then
-  echo "Installing persona subagents to $AGENTS_DST ..."
-  mkdir -p "$AGENTS_DST"
-  cp "$AGENTS_SRC"/*.md "$AGENTS_DST/"
-  echo "$(green "✓") Subagents installed (delegate with, e.g., \"have robin review this diff\")"
-  echo ""
-fi
-
-# 2. Install slash commands
-echo "Installing slash commands to $COMMANDS_DST ..."
-mkdir -p "$COMMANDS_DST"
-cp "$COMMANDS_SRC"/*.md "$COMMANDS_DST/"
-echo "$(green "✓") Slash commands installed:"
-for f in "$COMMANDS_DST"/*.md; do
-  echo "    $(dim "$f")"
-done
-echo ""
-
-# 3. Install CLI (symlink so updates in the repo take effect immediately)
+# 1. Install CLI first (symlink so updates in the repo take effect immediately).
+# It has to precede the sync below, which delegates to the CLI just installed.
 echo "Installing CLI to $BIN_DST ..."
 mkdir -p "$(dirname "$BIN_DST")"
 ln -sf "$BIN_SRC" "$BIN_DST"
 chmod +x "$BIN_SRC"
 echo "$(green "✓") CLI symlinked: $(dim "$BIN_DST → $BIN_SRC")"
 echo ""
+
+# 2. Install profiles, subagents, and slash commands. The CLI owns the copying,
+# so install.sh and 'claude-team sync' cannot drift: a persona is three
+# self-contained files, and only one code path may decide where they land.
+echo "Installing profiles, subagents, and slash commands ..."
+"$BIN_SRC" sync
 
 # 3b. Register the SessionStart hook. hooks/hooks.json only applies on the
 # plugin install path, where CLAUDE_PLUGIN_ROOT resolves, so this path needs

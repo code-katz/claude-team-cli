@@ -530,6 +530,35 @@ rm -rf "$HOOK_REPO"
 
 echo ""
 
+# claude-team sync: a persona lives as three self-contained installed files, so
+# a profile edit must reach the profile copy AND the regenerated subagent, and a
+# command edit must reach the slash command. Runs against a throwaway clone so
+# the edits never touch the real repo.
+echo "claude-team sync"
+
+SYNC_REPO=$(mktemp -d)
+SYNC_HOME=$(mktemp -d)
+cp -R "$REPO_DIR"/profiles "$REPO_DIR"/commands "$REPO_DIR"/agents \
+      "$REPO_DIR"/scripts "$REPO_DIR"/bin "$SYNC_REPO/"
+printf '\nSYNC-PROFILE-MARKER\n' >> "$SYNC_REPO/profiles/robin.md"
+printf '\nSYNC-COMMAND-MARKER\n' >> "$SYNC_REPO/commands/robin.md"
+
+if HOME="$SYNC_HOME" bash "$SYNC_REPO/bin/claude-team" sync >/dev/null 2>&1; then
+  ok "claude-team sync runs clean"
+else
+  fail "claude-team sync runs clean"
+fi
+assert_file_has "sync propagates a profile edit to the installed profile" \
+  "$SYNC_HOME/.claude/team/robin.md" "SYNC-PROFILE-MARKER"
+assert_file_has "sync regenerates the subagent from the edited profile" \
+  "$SYNC_HOME/.claude/agents/robin.md" "SYNC-PROFILE-MARKER"
+assert_file_has "sync propagates a command edit to the installed command" \
+  "$SYNC_HOME/.claude/commands/robin.md" "SYNC-COMMAND-MARKER"
+assert_file_has "sync installs tiers.conf" "$SYNC_HOME/.claude/team/tiers.conf" "akira"
+rm -rf "$SYNC_REPO" "$SYNC_HOME"
+
+echo ""
+
 # install.sh end to end into an isolated HOME: files land where the CLI
 # expects them, and the coordinator prompt delegates to the CLI code path
 echo "install.sh"
