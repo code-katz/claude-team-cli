@@ -42,6 +42,14 @@ run_cmd() {
   CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" "$@"
 }
 
+# The branch section needs a git repo to work in. A separate helper rather than
+# a mid-file redefinition of run_cmd: redefining a function trips shellcheck
+# (SC2218) and makes every earlier call ambiguous to a human reader too.
+# $BRANCH_REPO is set by that section before anything calls this.
+run_branch() {
+  (cd "$BRANCH_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" "$@")
+}
+
 # ─── Assertion helpers ───────────────────────────────────────────────────────
 
 ok()   { PASS=$((PASS + 1)); printf "  \033[32m✓\033[0m %s\n" "$1"; }
@@ -418,23 +426,20 @@ BRANCH_REPO=$(mktemp -d)
 BRANCH_PROJECT=$(basename "$BRANCH_REPO")
 git init -q "$BRANCH_REPO"
 git -C "$BRANCH_REPO" commit -q --allow-empty -m init
-run_cmd() {
-  (cd "$BRANCH_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" "$@")
-}
 
 # status warns when no index exists
-out=$(run_cmd branch status 2>&1)
+out=$(run_branch branch status 2>&1)
 assert_contains "branch status warns when no active branch" "none|No branch|no active|No active" "$out"
 
 # start registers a branch
-run_cmd branch start feat/test-branch >/dev/null
+run_branch branch start feat/test-branch >/dev/null
 assert_file_has "branch start creates index"            "$BRANCHES_INDEX" "Branch Index"
 assert_file_has "branch start writes branch name"       "$BRANCHES_INDEX" "feat/test-branch"
 assert_file_has "branch start writes project name"      "$BRANCHES_INDEX" "$BRANCH_PROJECT"
 assert_file_has "branch start writes active status"     "$BRANCHES_INDEX" "active"
 
 # status shows active branch
-out=$(run_cmd branch status)
+out=$(run_branch branch status)
 assert_contains "branch status shows active branch"     "feat/test-branch" "$out"
 
 # start blocked when active already exists
@@ -445,26 +450,26 @@ else
 fi
 
 # done marks merged
-out=$(run_cmd branch "done" 2>&1)
+out=$(run_branch branch "done" 2>&1)
 assert_contains "branch done output mentions merged"    "merged" "$out"
 assert_file_has "branch done updates status in index"   "$BRANCHES_INDEX" "merged"
 
 # status after done shows none
-out=$(run_cmd branch status 2>&1)
+out=$(run_branch branch status 2>&1)
 assert_contains "branch status after done shows none"   "none|No branch|no active|No active" "$out"
 
 # start with --plan links a plan slug
-run_cmd branch start feat/with-plan --plan some-plan-slug >/dev/null
+run_branch branch start feat/with-plan --plan some-plan-slug >/dev/null
 assert_file_has "branch start --plan writes plan slug"  "$BRANCHES_INDEX" "some-plan-slug"
 
 # abandon marks abandoned
-out=$(run_cmd branch abandon 2>&1)
+out=$(run_branch branch abandon 2>&1)
 assert_contains "branch abandon output mentions abandoned" "abandoned" "$out"
 assert_file_has "branch abandon updates status in index"  "$BRANCHES_INDEX" "abandoned"
 
 # list shows full table
-run_cmd branch start feat/listable >/dev/null
-out=$(run_cmd branch list 2>&1)
+run_branch branch start feat/listable >/dev/null
+out=$(run_branch branch list 2>&1)
 assert_contains "branch list shows header"              "Branch Index" "$out"
 assert_contains "branch list shows branch entry"        "feat/listable" "$out"
 
@@ -503,10 +508,6 @@ rm -f "$_foreign_hook_src"
 rm -rf "$GUARD_REPO"
 echo ""
 
-# The branch section overrode run_cmd with a fixture-scoped version; restore it.
-run_cmd() {
-  CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" "$@"
-}
 rm -rf "$BRANCH_REPO"
 
 # session commands
