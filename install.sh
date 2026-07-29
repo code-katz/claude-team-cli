@@ -79,6 +79,16 @@ chmod +x "$BIN_SRC"
 echo "$(green "✓") CLI symlinked: $(dim "$BIN_DST → $BIN_SRC")"
 echo ""
 
+# 3b. Register the SessionStart hook. hooks/hooks.json only applies on the
+# plugin install path, where CLAUDE_PLUGIN_ROOT resolves, so this path needs
+# the absolute hook path written into settings.json. The CLI owns the merge,
+# so the logic lives in one place and the test suite exercises this same path.
+# Non-fatal: the hook is an enhancement, and an unparseable pre-existing
+# settings.json must not abandon an install whose core is already in place.
+echo "Registering the SessionStart hook ..."
+"$BIN_SRC" install-hook || echo "$(yellow "!") Hook not registered. Fix the error above, then run: claude-team install-hook"
+echo ""
+
 # 4. Create branch index if it doesn't exist
 if [[ ! -f "$BRANCHES_INDEX" ]]; then
   mkdir -p "$(dirname "$BRANCHES_INDEX")"

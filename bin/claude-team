@@ -897,6 +897,75 @@ cmd_session() {
   esac
 }
 
+# Register bin/team-session-start as a SessionStart hook in ~/.claude/settings.json.
+# hooks/hooks.json covers the plugin install path only, where CLAUDE_PLUGIN_ROOT
+# resolves; install.sh users need the absolute path written into settings instead.
+cmd_install_hook() {
+  local repo_dir hook settings
+  repo_dir="$(cd "$(dirname "$(readlink "$0" 2>/dev/null || echo "$0")")/.." && pwd)"
+  hook="$repo_dir/bin/team-session-start"
+  settings="$HOME/.claude/settings.json"
+
+  [[ -f "$hook" ]] || die "Session hook not found: $hook
+Make sure you are running this from the claude-team-cli repo."
+  chmod +x "$hook"
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "$(yellow "!") python3 not found, so settings.json cannot be merged safely."
+    echo "  Add this SessionStart hook to $settings by hand:"
+    echo ""
+    echo "    $(dim "{\"hooks\":{\"SessionStart\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$hook\"}]}]}}")"
+    echo ""
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$settings")"
+  # Merge rather than overwrite: settings.json is the user's file, and a
+  # reinstall or a moved clone must replace our stale entry, not stack on it.
+  python3 - "$settings" "$hook" <<'PY'
+import json, os, sys, tempfile
+
+settings_path, hook_path = sys.argv[1], sys.argv[2]
+
+try:
+    with open(settings_path) as f:
+        settings = json.load(f)
+    if not isinstance(settings, dict):
+        raise ValueError("settings.json is not a JSON object")
+except FileNotFoundError:
+    settings = {}
+except (ValueError, OSError) as e:
+    sys.exit(f"error: cannot parse {settings_path} ({e}). Fix or move it, then rerun.")
+
+hooks = settings.setdefault("hooks", {})
+starts = hooks.setdefault("SessionStart", [])
+if not isinstance(starts, list):
+    sys.exit(f"error: hooks.SessionStart in {settings_path} is not a list. Fix it, then rerun.")
+
+
+def ours(matcher):
+    """True when this entry points at any team-session-start, including a stale path."""
+    return any(
+        os.path.basename(str(h.get("command", "")).strip('"')) == "team-session-start"
+        for h in matcher.get("hooks", [])
+        if isinstance(h, dict)
+    )
+
+
+starts[:] = [m for m in starts if not (isinstance(m, dict) and ours(m))]
+starts.append({"hooks": [{"type": "command", "command": hook_path}]})
+
+# Atomic replace, so an interrupted write cannot truncate the user's settings.
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(settings_path) or ".")
+with os.fdopen(fd, "w") as f:
+    json.dump(settings, f, indent=2)
+    f.write("\n")
+os.replace(tmp, settings_path)
+PY
+
+  echo "$(green "✓") SessionStart hook registered: $(dim "$settings")"
+}
+
 cmd_help() {
   echo ""
   echo "$(bold "claude-team") — Manage Claude Code team member personas"
@@ -911,6 +980,7 @@ cmd_help() {
   echo "  claude-team coordinator prod        Enable coordinator (prod — branch enforcement on)"
   echo "  claude-team coordinator off         Disable coordinator"
   echo "  claude-team install-commands        Install slash commands to ~/.claude/commands/"
+  echo "  claude-team install-hook            Register the SessionStart hook in ~/.claude/settings.json"
   echo ""
   echo "$(bold "Dedicated persona sessions:")"
   echo "  claude-team launch <persona>        Open a Claude Code session with the persona baked in"
@@ -973,6 +1043,7 @@ case "${1:-help}" in
   status)           cmd_status ;;
   coordinator)      cmd_coordinator "${2:-}" ;;
   install-commands) cmd_install_commands ;;
+  install-hook)     cmd_install_hook ;;
   launch)           shift; cmd_launch "$@" ;;
   branch)           shift; cmd_branch "$@" ;;
   session)          shift; cmd_session "$@" ;;
