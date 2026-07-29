@@ -127,14 +127,7 @@ echo "  SessionStart hook, and the coordinator. Slash commands work right now."
 echo ""
 echo "Quick start:"
 echo "  claude-team list                   $(dim "# see your team")"
-echo "  claude-team use robin              $(dim "# activate Robin (Testing)")"
-echo "  claude-team use akira              $(dim "# activate Akira (Backend)")"
-echo "  claude-team use sasha              $(dim "# activate Sasha (Frontend)")"
-echo "  claude-team use toni               $(dim "# activate Toni (Product Marketing)")"
-echo "  claude-team use river              $(dim "# activate River (Product)")"
-echo "  claude-team use sage               $(dim "# activate Sage (Business Advisor)")"
-echo "  claude-team use kai                $(dim "# activate Kai (UX Design)")"
-echo "  claude-team use iris               $(dim "# activate Iris (Brand & Illustration)")"
+echo "  claude-team use <name>             $(dim "# activate a team member for all new sessions")"
 echo "  claude-team coordinator on         $(dim "# casual mode (commit to main, no branch enforcement)")"
 echo "  claude-team coordinator prod       $(dim "# prod mode (branch required before code)")"
 echo "  claude-team coordinator off        $(dim "# disable coordinator")"
@@ -153,5 +146,14 @@ echo "  claude-team branch abandon             $(dim "# mark abandoned")"
 echo "  claude-team branch guard install       $(dim "# block accidental commits on main")"
 echo ""
 echo "Slash commands $(dim "(switch personas mid-session, no restart needed)"):"
-echo "  /robin   /akira   /sasha   /toni   /river   /sage   /kai   /iris   /team   /branch   /session"
+# Derived from the profiles just installed. The hardcoded line this replaces
+# listed 8 of the 17 personas, so more than half the team was undiscoverable
+# from the installer's own output.
+printf '  '
+for _p in "$REPO_DIR"/profiles/*.md; do
+  _n=$(basename "$_p" .md)
+  case "$_n" in coordinator*) continue ;; esac
+  printf '/%s  ' "$_n"
+done
+printf '\n  /team  /branch  /session  /parallel\n'
 echo ""
