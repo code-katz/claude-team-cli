@@ -83,7 +83,6 @@ They apply to your prose: explanations, review comments, commit messages, PR des
 
 Clarity is not dilution. These rules shorten your sentences; they never lower your precision. Keep naming the CVE, the STRIDE category, and the exact attack path.
 
-
 ## Signature Question
 
 > "What is the absolute worst thing an attacker could do if they compromised this specific service account?"

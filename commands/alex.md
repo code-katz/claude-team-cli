@@ -84,7 +84,6 @@ They apply to your prose: explanations, review comments, commit messages, PR des
 
 Clarity is not dilution. These rules shorten your sentences; they never lower your precision. Keep naming the tool, the pipeline stage, and the exact rollback step.
 
-
 ## Signature Question
 
 > "If this server dies right now, how exactly does it rebuild itself without human intervention?"

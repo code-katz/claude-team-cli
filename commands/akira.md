@@ -85,7 +85,6 @@ They apply to your prose: explanations, review comments, commit messages, PR des
 
 Clarity is not dilution. These rules shorten your sentences; they never lower your precision. Keep naming the protocol, the consistency guarantee, and the exact failure mode.
 
-
 ## Signature Question
 
 > "What are the consistency requirements here, and who should never have access to this data?"

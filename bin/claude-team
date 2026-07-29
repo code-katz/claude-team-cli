@@ -34,14 +34,184 @@ die() { echo "$(red "error:") $*" >&2; exit 1; }
 lowercase() { printf '%s\n' "${1,,}"; }
 capitalize() { printf '%s\n' "${1^}"; }
 
+# ─── Shared-state locking ────────────────────────────────────────────────────
+
+# ~/.claude/CLAUDE.md and ~/.claude/branches/INDEX.md are shared by every
+# Claude Code session on this machine, and several commands rewrite them
+# read-modify-write. Every writer must take this lock, appends included: an
+# append is atomic by itself, but an append that lands between a rewriter's
+# read and its rename is discarded by that rename. Readers take no lock,
+# because a rewrite lands with a rename inside one filesystem, so a reader
+# sees either the whole old file or the whole new one.
+#
+# The lock is a directory. mkdir either creates the directory or fails, in one
+# filesystem operation, on Linux and macOS alike. flock is the usual tool for
+# this, but stock macOS does not ship it and this project supports macOS.
+#
+# The kernel does not release a directory lock when the holder dies, so:
+#   - the holder records host, PID, and acquisition time in <lock>/owner;
+#   - the EXIT, INT, and TERM traps release the lock on every exit except
+#     SIGKILL and power loss;
+#   - a contender breaks a lock whose holder is a dead process on this host,
+#     or whose age exceeds LOCK_STALE_SECONDS. The age rule also covers a lock
+#     left by a reboot, where the recorded PID may since have been reassigned
+#     to a live process.
+#
+# The critical sections are a few awk passes over a small file, so a wait of
+# seconds already means a holder is stuck rather than queued.
+LOCK_WAIT_SECONDS=15
+LOCK_STALE_SECONDS=120
+LOCK_POLL_SECONDS=0.05
+LOCK_HOST="${HOSTNAME:-$(uname -n 2>/dev/null || echo unknown)}"
+
+_LOCK_DIR=""   # non-empty while this process holds a lock
+_TMP_FILE=""   # non-empty while a temp file waits for its rename
+
+_lock_owner() { cat "$1/owner" 2>/dev/null || true; }
+
+# True only when the lock holder is provably gone: a dead PID on this host, or
+# an acquisition older than LOCK_STALE_SECONDS.
+#
+# Two states deliberately count as live. An absent lock directory is not
+# stale: the next mkdir wins it, and breaking it would delete a directory that
+# another contender has since created. A lock whose owner record is not
+# readable yet is not stale either: every live holder passes through that
+# state between its mkdir and its record write, so breaking on it removes live
+# locks under load. lock_acquire handles a holder that died inside that window
+# separately, at the deadline.
+_lock_is_stale() {
+  local lock_dir="$1" host pid started now
+  [[ -d "$lock_dir" ]] || return 1
+  if ! read -r host pid started < "$lock_dir/owner" 2>/dev/null; then
+    return 1
+  fi
+  now=$(date '+%s')
+  if [[ "$started" =~ ^[0-9]+$ ]] && (( now - started > LOCK_STALE_SECONDS )); then
+    return 0
+  fi
+  if [[ "$host" == "$LOCK_HOST" && "$pid" =~ ^[0-9]+$ ]] && ! kill -0 "$pid" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
+# Claim the lock directory. _LOCK_DIR is set before the owner record is
+# written, so the traps remove the directory if this process dies in between.
+_lock_take() {
+  local lock_dir="$1"
+  mkdir "$lock_dir" 2>/dev/null || return 1
+  _LOCK_DIR="$lock_dir"
+  printf '%s %s %s\n' "$LOCK_HOST" "$$" "$(date '+%s')" > "$lock_dir/owner" \
+    || die "Cannot write the lock owner record: $lock_dir/owner"
+  return 0
+}
+
+# Take the lock for a shared file. Waits up to LOCK_WAIT_SECONDS, then fails
+# with the holder's identity and the command that clears the lock by hand.
+#
+# Before it breaks a stale lock, the contender confirms the verdict twice,
+# LOCK_POLL_SECONDS apart, with an unchanged owner record, so a lock that
+# another contender took in between survives. The residual window is the few
+# microseconds between the second check and the removal, and it opens only
+# once a holder has already died.
+lock_acquire() {
+  local target="$1" lock_dir="$1.lock" deadline snapshot broke_once=false
+  deadline=$(( SECONDS + LOCK_WAIT_SECONDS ))
+  mkdir -p "$(dirname "$lock_dir")"
+  while true; do
+    if _lock_take "$lock_dir"; then
+      return 0
+    fi
+    if _lock_is_stale "$lock_dir"; then
+      snapshot=$(_lock_owner "$lock_dir")
+      sleep "$LOCK_POLL_SECONDS"
+      if _lock_is_stale "$lock_dir" && [[ "$(_lock_owner "$lock_dir")" == "$snapshot" ]]; then
+        rm -rf "$lock_dir"
+      fi
+      continue
+    fi
+    if (( SECONDS >= deadline )); then
+      # An owner record still missing after the full wait belongs to a holder
+      # that died between its mkdir and its record write: no live holder stays
+      # in that state for seconds. Break it once, then wait again.
+      if [[ "$broke_once" == false && -d "$lock_dir" && ! -s "$lock_dir/owner" ]]; then
+        broke_once=true
+        rm -rf "$lock_dir"
+        deadline=$(( SECONDS + LOCK_WAIT_SECONDS ))
+        continue
+      fi
+      die "Timed out after ${LOCK_WAIT_SECONDS}s waiting for the lock on $target.
+Holder (host pid epoch): $(_lock_owner "$lock_dir")
+If no other claude-team command is running, remove the lock:
+  rm -rf $lock_dir"
+    fi
+    sleep "$LOCK_POLL_SECONDS"
+  done
+}
+
+# Release the lock this process holds. The removal is conditional on the owner
+# record still naming this process: if a contender broke the lock, the
+# directory belongs to that contender and must survive.
+lock_release() {
+  [[ -n "$_LOCK_DIR" ]] || return 0
+  local dir="$_LOCK_DIR" owner_pid
+  _LOCK_DIR=""
+  owner_pid=$(awk '{print $2; exit}' "$dir/owner" 2>/dev/null || true)
+  if [[ "$owner_pid" == "$$" ]]; then
+    rm -rf "$dir"
+  fi
+  return 0
+}
+
+# Runs on a normal exit, on die, on a set -e failure, and on Ctrl-C. Nothing
+# runs on SIGKILL or power loss; lock_acquire's staleness rule covers those.
+_cleanup() {
+  lock_release
+  if [[ -n "$_TMP_FILE" ]]; then
+    rm -f "$_TMP_FILE"
+    _TMP_FILE=""
+  fi
+  return 0
+}
+trap _cleanup EXIT
+trap '_cleanup; exit 130' INT
+trap '_cleanup; exit 143' TERM
+
+# Create a temp file in the target's own directory and register it for
+# cleanup. mktemp otherwise writes to TMPDIR, which is often tmpfs and so a
+# different filesystem from $HOME. mv across filesystems degrades to copy plus
+# unlink, which is not atomic: a reader can see a partial file, and an
+# interrupted copy leaves one behind.
+tmp_beside() {
+  local target="$1" dir
+  dir=$(dirname "$target")
+  mkdir -p "$dir"
+  _TMP_FILE=$(mktemp "$dir/.claude-team.XXXXXX")
+  printf '%s\n' "$_TMP_FILE"
+}
+
+# Put a temp file from tmp_beside in place. Source and target share a
+# filesystem, so this is a rename: readers see the old file or the new one.
+tmp_commit() {
+  mv "$1" "$2"
+  _TMP_FILE=""
+}
+
 require_profiles_dir() {
   [[ -d "$PROFILES_DIR" ]] || die "Profiles directory not found: $PROFILES_DIR
 Run the installer first: bash install.sh"
 }
 
+# A profile name is an identifier, not a path: it is the basename of a file in
+# PROFILES_DIR. The character check rejects everything else, so a name cannot
+# reach the filesystem as '../' traversal, and cannot be read as an option by a
+# command that is given it later. The check is a character class rather than
+# path resolution because macOS ships no 'readlink -f'.
 resolve_name() {
   local input
   input=$(lowercase "$1")
+  [[ "$input" =~ ^[a-z0-9][a-z0-9_-]*$ ]] \
+    || die "Invalid profile name: '$1'. A name uses letters, digits, '-', and '_', and starts with a letter or digit."
   local profile="$PROFILES_DIR/$input.md"
   [[ -f "$profile" ]] || die "No profile found for '$input'. Run 'claude-team list' to see available team members."
   echo "$profile"
@@ -61,6 +231,15 @@ title_role() {
   printf '%s\n' "${1#*— }"
 }
 
+# Print a profile without its trailing "## Greeting" section. That section
+# holds the line a persona says at the moment a session switches to it, so it
+# belongs only where a session starts now. The section runs to end of file, so
+# stopping at its heading is the whole excision. A profile without the heading
+# prints unchanged.
+profile_without_greeting() {
+  awk '/^## Greeting[[:space:]]*$/{exit} {print}' "$1"
+}
+
 get_active() {
   [[ -f "$CLAUDE_MD" ]] || { echo ""; return; }
   # Extract the name line from the active block
@@ -70,14 +249,17 @@ get_active() {
 }
 
 # Replace the marked block in a file, or append it if absent. All edits go
-# through a temp file and land with mv: a redirection straight onto the
+# through a temp file and land with a rename: a redirection straight onto the
 # target would truncate it before the pipeline runs, so any failure could
-# destroy the user's file.
+# destroy the user's file. The lock covers the whole read-modify-write. Two
+# sessions writing different blocks of the same file otherwise lose one of
+# them, or each fail to see the other's marker and append a second copy.
 block_install() {
   local file="$1" start="$2" end="$3" content="$4"
+  lock_acquire "$file"
   touch "$file"
   local tmp
-  tmp=$(mktemp)
+  tmp=$(tmp_beside "$file")
   if grep -qF "$start" "$file"; then
     awk -v m="$start" 'index($0, m){exit} {print}' "$file" > "$tmp"
     printf '%s\n%s\n%s\n' "$start" "$content" "$end" >> "$tmp"
@@ -86,16 +268,20 @@ block_install() {
     cat "$file" > "$tmp"
     printf '\n%s\n%s\n%s\n' "$start" "$content" "$end" >> "$tmp"
   fi
-  mv "$tmp" "$file"
+  tmp_commit "$tmp" "$file"
+  lock_release
 }
 
-# Remove the marked block from a file atomically. Blank lines the removed
-# block leaves at end-of-file are trimmed; everything above it, including
-# the user's own trailing spaces and leading blank lines, is preserved.
+# Remove the marked block from a file. The new content lands with a rename
+# inside one filesystem, so a reader sees the file with the block or without
+# it, never a partial file. Blank lines the removed block leaves at
+# end-of-file are trimmed; everything above it, including the user's own
+# trailing spaces and leading blank lines, is preserved.
 block_remove() {
   local file="$1" start="$2" end="$3"
+  lock_acquire "$file"
   local tmp
-  tmp=$(mktemp)
+  tmp=$(tmp_beside "$file")
   awk -v s="$start" -v e="$end" '
     index($0, s){skip=1}
     skip && index($0, e){skip=0; next}
@@ -105,7 +291,8 @@ block_remove() {
       for (i = 1; i <= n; i++) print lines[i]
     }
   ' "$file" > "$tmp"
-  mv "$tmp" "$file"
+  tmp_commit "$tmp" "$file"
+  lock_release
 }
 
 # ─── Commands ────────────────────────────────────────────────────────────────
@@ -165,8 +352,11 @@ cmd_use() {
   local profile
   profile=$(resolve_name "$name")
 
+  # 'use' pins the persona globally, so every future session reads what lands
+  # here. The greeting is dropped: pinned, it makes every new session open with
+  # the same line forever.
   local content
-  content=$(cat "$profile")
+  content=$(profile_without_greeting "$profile")
   block_install "$CLAUDE_MD" "$MARKER_START" "$MARKER_END" "$content"
 
   local display_name
@@ -349,11 +539,17 @@ get_project_name() {
   basename "$root"
 }
 
+# Create the index if it is absent. Read-only commands call this too, so it
+# takes no lock. noclobber supplies the exclusion instead: it makes the
+# redirect fail rather than truncate when another session created the index
+# between the test below and the write.
 ensure_branches_index() {
   if [[ ! -f "$BRANCHES_INDEX" ]]; then
     mkdir -p "$(dirname "$BRANCHES_INDEX")"
+    set -C
     printf '# Branch Index\n\n| Date | Project | Branch | Plan Slug | Status | Notes |\n|---|---|---|---|---|---|\n' \
-      > "$BRANCHES_INDEX"
+      > "$BRANCHES_INDEX" 2>/dev/null || true
+    set +C
   fi
 }
 
@@ -404,6 +600,10 @@ cmd_branch_start() {
   local project
   project=$(get_project_name)
 
+  # One lock spans the check and the append. Without it two sessions both find
+  # no active branch and both register one for the same project.
+  lock_acquire "$BRANCHES_INDEX"
+
   # Block if an active branch already exists for this project
   local existing
   existing=$(get_active_branch "$project")
@@ -419,6 +619,8 @@ Run 'claude-team branch done' or 'claude-team branch abandon' before starting a 
   printf '| %s | %s | %s | %s | active | |\n' \
     "$today" "$project" "$branch_name" "$plan_slug" >> "$BRANCHES_INDEX"
 
+  lock_release
+
   echo ""
   echo "$(green "✓") Branch $(bold "$branch_name") registered for $(bold "$project")."
   [[ -n "$plan_slug" ]] && echo "$(dim "  Linked to plan: $plan_slug")"
@@ -431,12 +633,16 @@ cmd_branch_close() {
   local project
   project=$(get_project_name)
 
+  # One lock spans the read, the rewrite, and the rename. Without it a row
+  # another session appends after the read is discarded by the rename.
+  lock_acquire "$BRANCHES_INDEX"
+
   local active
   active=$(get_active_branch "$project")
   [[ -n "$active" ]] || die "No active branch found for '$project'. Nothing to close."
 
   local tmp
-  tmp=$(mktemp)
+  tmp=$(tmp_beside "$BRANCHES_INDEX")
   awk -F'|' -v proj="$project" -v ns="$new_status" '
     {
       p = $3; st = $6
@@ -451,7 +657,10 @@ cmd_branch_close() {
       }
       print
     }
-  ' "$BRANCHES_INDEX" > "$tmp" && mv "$tmp" "$BRANCHES_INDEX"
+  ' "$BRANCHES_INDEX" > "$tmp" || die "Failed to rewrite the branch index: $BRANCHES_INDEX"
+  tmp_commit "$tmp" "$BRANCHES_INDEX"
+
+  lock_release
 
   echo ""
   if [[ "$new_status" == "merged" ]]; then
@@ -519,7 +728,7 @@ cmd_branch_guard() {
           || die "A pre-commit hook already exists at $hook_file (not installed by claude-team). Remove it manually first."
       fi
       local tmp_hook
-      tmp_hook=$(mktemp)
+      tmp_hook=$(tmp_beside "$hook_file")
       cat > "$tmp_hook" << 'HOOK'
 #!/usr/bin/env bash
 # Installed by claude-team branch guard
@@ -531,7 +740,7 @@ if [[ "$branch" == "main" || "$branch" == "master" ]]; then
   exit 1
 fi
 HOOK
-      mv "$tmp_hook" "$hook_file"
+      tmp_commit "$tmp_hook" "$hook_file"
       chmod +x "$hook_file"
       echo ""
       echo "$(green "✓") Branch guard installed."
@@ -754,12 +963,18 @@ Run: claude-team session status"
     fi
   fi
 
-  # Register in INDEX.md
+  # Register in INDEX.md. The append takes the lock even though an append to a
+  # file opened O_APPEND cannot be torn: an unlocked append that lands inside
+  # another session's read-modify-write window is discarded by its rename.
+  # The lock is taken here rather than around the whole command, so creating a
+  # worktree, which takes seconds, never blocks another session's index write.
+  lock_acquire "$BRANCHES_INDEX"
   ensure_branches_index
   local today
   today=$(date '+%Y-%m-%d')
   printf '| %s | %s | %s | %s | active | worktree |\n' \
     "$today" "$project" "$branch_name" "$plan_slug" >> "$BRANCHES_INDEX"
+  lock_release
 
   echo ""
   echo "$(green "✓") Session started"
@@ -814,9 +1029,11 @@ Run this from inside a session worktree, or use 'claude-team branch done' for no
   git_common_dir=$(git -C "$worktree_path" rev-parse --git-common-dir 2>/dev/null)
   repo_root=$(dirname "$git_common_dir")
 
-  # Mark merged in INDEX.md
+  # Mark merged in INDEX.md. The lock spans the rewrite and the rename, so a
+  # row another session appends in between is not discarded.
+  lock_acquire "$BRANCHES_INDEX"
   local tmp
-  tmp=$(mktemp)
+  tmp=$(tmp_beside "$BRANCHES_INDEX")
   awk -F'|' -v proj="$project" -v br="$branch" '
     {
       p = $3; b = $4; st = $6
@@ -831,7 +1048,9 @@ Run this from inside a session worktree, or use 'claude-team branch done' for no
       }
       print
     }
-  ' "$BRANCHES_INDEX" > "$tmp" && mv "$tmp" "$BRANCHES_INDEX"
+  ' "$BRANCHES_INDEX" > "$tmp" || die "Failed to rewrite the branch index: $BRANCHES_INDEX"
+  tmp_commit "$tmp" "$BRANCHES_INDEX"
+  lock_release
 
   # Remove worktree (must be called from outside the worktree)
   git -C "$repo_root" worktree remove "$worktree_path" 2>/dev/null \

@@ -83,7 +83,6 @@ They apply to your prose: explanations, review comments, commit messages, PR des
 
 Clarity is not dilution. These rules shorten your sentences; they never lower your precision. Keep naming the test pattern, the tolerated flake rate, and the exact assertion that fails.
 
-
 ## Signature Question
 
 > "What's the failure mode we haven't considered yet, and could an attacker exploit it?"

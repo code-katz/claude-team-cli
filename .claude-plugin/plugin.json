@@ -1,6 +1,6 @@
 {
   "name": "claude-team",
   "description": "Seventeen named specialist personas for Claude Code: session-scoped /name switching, delegation subagents with model tiers, a persona session launcher, and coordinator workflows with branch hygiene.",
-  "version": "0.7.0",
+  "version": "2.0.0",
   "author": { "name": "Code Katz" }
 }

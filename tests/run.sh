@@ -137,12 +137,43 @@ assert_contains "case-insensitive show"     "Robin — QA" "$out"
 assert_exits_nonzero "invalid name exits nonzero" "$CLI" show nobody
 echo ""
 
+# A profile name is an identifier, not a path. resolve_name is the single choke
+# point for show, use, and launch. '../gtm' is the regression target because
+# $PROFILES_DIR/../gtm.md genuinely exists and is lowercase, so it resolved
+# before the fix. Traversal read nothing the caller could not already cat, but
+# it let a non-profile reach the global pin and printed a success line with an
+# empty name.
+echo "name validation"
+# Guard the guard: if gtm.md ever moves, every assertion below would pass for
+# the wrong reason, because the traversal would resolve to nothing either way.
+if [[ -f "$REPO_DIR/gtm.md" ]]; then ok "traversal target exists, so these tests are not vacuous"
+else fail "traversal target exists, so these tests are not vacuous (gtm.md moved: repoint these tests)"; fi
+assert_exits_nonzero "show rejects traversal to a real file"   "$CLI" show ../gtm
+assert_exits_nonzero "use rejects traversal to a real file"    "$CLI" use ../gtm
+assert_exits_nonzero "launch rejects traversal to a real file" "$CLI" launch ../gtm --dry-run
+assert_exits_nonzero "show rejects a nested traversal"         "$CLI" show sub/../../gtm
+assert_exits_nonzero "show rejects a leading dash"             "$CLI" show -n
+assert_exits_nonzero "show rejects an empty name"              "$CLI" show ""
+out=$(run_cmd show ../gtm 2>&1 || true)
+assert_contains     "traversal reports an invalid name"      "Invalid profile name" "$out"
+assert_not_contains "traversal discloses no outside content" "Go-to-Market"         "$out"
+run_cmd use ../gtm >/dev/null 2>&1 || true
+assert_file_lacks "a rejected name never reaches the global pin" "$CLAUDE_MD" "Go-to-Market"
+# The character class must not be so tight that real names stop resolving.
+out=$(run_cmd show coordinator-prod)
+assert_contains "hyphenated name still resolves" "Claude Team CLI" "$out"
+echo ""
+
 # use — basic injection
 echo "use"
 run_cmd use robin >/dev/null
 assert_file_has  "use injects CLAUDE-TEAM block"  "$CLAUDE_MD" "CLAUDE-TEAM:START"
 assert_file_has  "use injects Robin profile"       "$CLAUDE_MD" "Robin — QA"
 assert_count     "use creates exactly 1 block"     "$CLAUDE_MD" "CLAUDE-TEAM:START" 1
+# 'use' pins globally, so a greeting here would fire on every future session
+# rather than at the moment of the switch. The body must still arrive whole.
+assert_file_lacks "use excludes the greeting"      "$CLAUDE_MD" "^## Greeting"
+assert_file_has   "use keeps the signature question" "$CLAUDE_MD" "Signature Question"
 echo ""
 
 # use — persona switch
@@ -434,6 +465,94 @@ if [[ ! -d "$SESSION_WT3" ]]; then ok "session done removes metachar worktree"; 
 rm -rf "$SESSION_REPO"
 echo ""
 
+# Shared-state concurrency. ~/.claude/branches/INDEX.md and ~/.claude/CLAUDE.md
+# are shared across every session on the machine, and parallel sessions are the
+# product's headline feature, so concurrent access is the designed-for case.
+# Measured on the unlocked code: 8 of 12 rows survived, and CLAUDE.md grew
+# duplicate marker blocks when block_install took its append path against a
+# writer that had not landed yet.
+echo "shared-state concurrency"
+
+CONC_HOME=$(mktemp -d)
+CONC_INDEX="$CONC_HOME/.claude/branches/INDEX.md"
+mkdir -p "$CONC_HOME/.claude"
+CONC_ROOT=$(mktemp -d)
+for i in 1 2 3 4 5 6 7 8; do
+  git init -q "$CONC_ROOT/r$i"
+  (cd "$CONC_ROOT/r$i" && git commit -q --allow-empty -m init)
+done
+# Seed four registered branches, sequentially, so there is something to rewrite.
+for i in 1 2 3 4; do
+  (cd "$CONC_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" branch start "feat/c$i" >/dev/null 2>&1)
+done
+# Four rewriters and four appenders at once. A rewriter reads the whole index,
+# transforms it, and renames over it; an append landing inside that window is
+# erased by the rename, however atomic the append itself was.
+for i in 1 2 3 4; do
+  (cd "$CONC_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" branch "done" >/dev/null 2>&1) &
+done
+for i in 5 6 7 8; do
+  (cd "$CONC_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" branch start "feat/c$i" >/dev/null 2>&1) &
+done
+wait
+assert_count    "concurrent writers keep every row"     "$CONC_INDEX" '^| 2'       8
+assert_count    "concurrent rewrites all applied"       "$CONC_INDEX" '| merged |' 4
+assert_count    "concurrent appends all survived"       "$CONC_INDEX" '| active |' 4
+assert_file_has "concurrent writers keep the header"    "$CONC_INDEX" "Branch Index"
+if [[ ! -d "$CONC_INDEX.lock" ]]; then ok "no lock directory remains after success"; else fail "no lock directory remains after success"; fi
+rm -rf "$CONC_ROOT"
+
+# CLAUDE.md has two independent marker blocks written by different commands.
+# The duplicate-block count is the assertion that matters: block_install greps
+# for its start marker, misses it against an unlanded concurrent write, and
+# takes the append path, producing a second copy.
+CONC_MD="$CONC_HOME/.claude/CLAUDE.md"
+printf 'keep-this-line\n' > "$CONC_MD"
+for _ in 1 2 3 4 5; do
+  (CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" use akira >/dev/null 2>&1) &
+  (CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" coordinator on >/dev/null 2>&1) &
+done
+wait
+assert_count "concurrent writers leave one team block"        "$CONC_MD" "CLAUDE-TEAM:START"        1
+assert_count "concurrent writers leave one coordinator block" "$CONC_MD" "CLAUDE-COORDINATOR:START" 1
+assert_count "concurrent writers keep user content"           "$CONC_MD" "keep-this-line"           1
+rm -rf "$CONC_HOME"
+echo ""
+
+# Temp files must be created beside their destination, not in TMPDIR. A
+# cross-device rename degrades to copy plus unlink, during which a reader can
+# see a half-written index. An unusable TMPDIR proves the temp file is not
+# there: bare mktemp cannot create a file at all under this setting.
+echo "writes do not depend on TMPDIR"
+
+TMP_HOME=$(mktemp -d)
+mkdir -p "$TMP_HOME/.claude"
+TMP_REPO=$(mktemp -d)
+git init -q "$TMP_REPO"
+(cd "$TMP_REPO" && git commit -q --allow-empty -m init)
+run_notmp() {
+  TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" "$@"
+}
+if run_notmp use akira >/dev/null 2>&1; then ok "use works when TMPDIR is unusable"
+else fail "use works when TMPDIR is unusable"; fi
+if run_notmp reset >/dev/null 2>&1; then ok "reset works when TMPDIR is unusable"
+else fail "reset works when TMPDIR is unusable"; fi
+if run_notmp coordinator on >/dev/null 2>&1; then ok "coordinator on works when TMPDIR is unusable"
+else fail "coordinator on works when TMPDIR is unusable"; fi
+if (cd "$TMP_REPO" && TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" branch start feat/notmp >/dev/null 2>&1); then
+  ok "branch start works when TMPDIR is unusable"
+else fail "branch start works when TMPDIR is unusable"; fi
+# "done" is quoted throughout this suite so shellcheck does not read it as a
+# loop terminator (SC1010).
+if (cd "$TMP_REPO" && TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" branch "done" >/dev/null 2>&1); then
+  ok "branch done works when TMPDIR is unusable"
+else fail "branch done works when TMPDIR is unusable"; fi
+if [[ -z "$(find "$TMP_HOME" -name '.claude-team.*' 2>/dev/null)" ]]; then
+  ok "no temp file litter left in ~/.claude"
+else fail "no temp file litter left in ~/.claude"; fi
+rm -rf "$TMP_HOME" "$TMP_REPO"
+echo ""
+
 # launch + plugin surfaces
 echo "launch + plugin surfaces"
 
@@ -481,35 +600,49 @@ assert_contains "iris agent carries model tier" "model: claude-opus-4-8" "$(cat 
 assert_contains "agents marked as generated" "GENERATED from profiles" "$(cat "$REPO_DIR/agents/robin.md")"
 
 # Regeneration drift: CI never runs generate-agents.sh, and the count check above
-# only counts files. generate-agents.sh cats the profile verbatim into the agent,
-# so every non-blank profile line must appear verbatim in its agent. Catches a
-# profile edited without regenerating.
+# only counts files. generate-agents.sh copies the profile into the agent verbatim
+# except for the ## Greeting section, which belongs to the slash command. So every
+# non-blank profile line above ## Greeting must appear verbatim in its agent.
+# Catches a profile edited without regenerating.
 stale=""
 for profile in "$REPO_DIR"/profiles/*.md; do
   pname=$(basename "$profile" .md)
   case "$pname" in coordinator*) continue ;; esac
   agent="$REPO_DIR/agents/$pname.md"
   if [[ ! -f "$agent" ]]; then stale="$stale $pname(no-agent)"; continue; fi
-  drift=$(grep -v '^[[:space:]]*$' "$profile" | grep -F -x -v -c -f "$agent" - || true)
+  drift=$(awk '/^## Greeting$/ { exit } { print }' "$profile" \
+      | grep -v '^[[:space:]]*$' | grep -F -x -v -c -f "$agent" - || true)
   [[ "$drift" == "0" ]] || stale="$stale $pname($drift)"
 done
 if [[ -z "$stale" ]]; then ok "generated agents match their profiles"
 else fail "generated agents match their profiles (stale:$stale)"; fi
 
-# commands/<name>.md is hand-maintained and nothing validates it. By convention it
-# is the profile with Required Interactive Behaviors excised, 16 of 16 before Iris.
+# Same drift check for commands/, which generate-agents.sh derives from the same
+# profile: Required Interactive Behaviors excised, and the ## Greeting heading
+# replaced by its sentence as the trailer. So every non-blank profile line outside
+# those two sections, plus the greeting sentence, must appear verbatim in the
+# slash command.
 cdrift=""
 for profile in "$REPO_DIR"/profiles/*.md; do
   pname=$(basename "$profile" .md)
   case "$pname" in coordinator*) continue ;; esac
   cmd="$REPO_DIR/commands/$pname.md"
   if [[ ! -f "$cmd" ]]; then cdrift="$cdrift $pname(no-command)"; continue; fi
-  d=$(awk '/^## Required Interactive Behaviors$/{skip=1} /^## Signature Question$/{skip=0} !skip' "$profile" \
+  d=$(awk '/^## Required Interactive Behaviors$/{skip=1} /^## Signature Question$/{skip=0}
+           /^## Greeting$/{next} !skip' "$profile" \
       | grep -v '^[[:space:]]*$' | grep -F -x -v -c -f "$cmd" - || true)
   [[ "$d" == "0" ]] || cdrift="$cdrift $pname($d)"
 done
-if [[ -z "$cdrift" ]]; then ok "slash commands match their profiles"
-else fail "slash commands match their profiles (drift:$cdrift)"; fi
+if [[ -z "$cdrift" ]]; then ok "generated commands match their profiles"
+else fail "generated commands match their profiles (drift:$cdrift)"; fi
+
+# The greeting is a persona-switch line ("Greet the user briefly as Robin"). A
+# delegated subagent never switches the session, so it must not carry one.
+if grep -q '^## Greeting$' "$REPO_DIR"/agents/*.md; then
+  fail "greeting excluded from generated agents"
+else
+  ok "greeting excluded from generated agents"
+fi
 
 # team-session-start hook behavior
 HOOK="$REPO_DIR/bin/team-session-start"
@@ -530,18 +663,21 @@ rm -rf "$HOOK_REPO"
 
 echo ""
 
-# claude-team sync: a persona lives as three self-contained installed files, so
-# a profile edit must reach the profile copy AND the regenerated subagent, and a
-# command edit must reach the slash command. Runs against a throwaway clone so
-# the edits never touch the real repo.
+# claude-team sync: a persona lives as three self-contained installed files, and
+# the profile is the only one a human edits. One profile edit must reach the
+# installed profile, the regenerated subagent, and the regenerated slash command.
+# Runs against a throwaway clone so the edits never touch the real repo.
 echo "claude-team sync"
 
 SYNC_REPO=$(mktemp -d)
 SYNC_HOME=$(mktemp -d)
 cp -R "$REPO_DIR"/profiles "$REPO_DIR"/commands "$REPO_DIR"/agents \
       "$REPO_DIR"/scripts "$REPO_DIR"/bin "$SYNC_REPO/"
-printf '\nSYNC-PROFILE-MARKER\n' >> "$SYNC_REPO/profiles/robin.md"
-printf '\nSYNC-COMMAND-MARKER\n' >> "$SYNC_REPO/commands/robin.md"
+# Insert above ## Greeting, not at end of file: the greeting is the slash command
+# trailer, and everything under that heading is excised from the other two copies.
+awk '/^## Greeting$/ { print "SYNC-PROFILE-MARKER"; print "" } { print }' \
+    "$SYNC_REPO/profiles/robin.md" > "$SYNC_REPO/profiles/robin.md.new"
+mv "$SYNC_REPO/profiles/robin.md.new" "$SYNC_REPO/profiles/robin.md"
 
 if HOME="$SYNC_HOME" bash "$SYNC_REPO/bin/claude-team" sync >/dev/null 2>&1; then
   ok "claude-team sync runs clean"
@@ -552,8 +688,8 @@ assert_file_has "sync propagates a profile edit to the installed profile" \
   "$SYNC_HOME/.claude/team/robin.md" "SYNC-PROFILE-MARKER"
 assert_file_has "sync regenerates the subagent from the edited profile" \
   "$SYNC_HOME/.claude/agents/robin.md" "SYNC-PROFILE-MARKER"
-assert_file_has "sync propagates a command edit to the installed command" \
-  "$SYNC_HOME/.claude/commands/robin.md" "SYNC-COMMAND-MARKER"
+assert_file_has "sync regenerates the slash command from the edited profile" \
+  "$SYNC_HOME/.claude/commands/robin.md" "SYNC-PROFILE-MARKER"
 assert_file_has "sync installs tiers.conf" "$SYNC_HOME/.claude/team/tiers.conf" "akira"
 rm -rf "$SYNC_REPO" "$SYNC_HOME"
 
