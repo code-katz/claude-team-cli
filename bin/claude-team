@@ -1026,11 +1026,19 @@ Run this from inside a session worktree, or use 'claude-team branch done' for no
   project=$(grep '^project=' "$worktree_path/.claude-session" | cut -d= -f2)
   branch=$(grep '^branch=' "$worktree_path/.claude-session" | cut -d= -f2)
 
-  # Warn on uncommitted changes
-  if ! git -C "$worktree_path" diff --quiet 2>/dev/null || \
-     ! git -C "$worktree_path" diff --cached --quiet 2>/dev/null; then
-    echo "$(red "⚠") Uncommitted changes in worktree." >&2
-    echo "  Commit or stash before closing the session." >&2
+  # Refuse to close a worktree that still holds work. git status --porcelain
+  # reports staged, unstaged, AND untracked in one pass. The previous check used
+  # two git diff calls, neither of which sees an untracked file, so a new file
+  # that had not been git added yet was deleted below with no warning and a
+  # zero exit. A file you have written but not staged is the most ordinary
+  # state in a working session, so that was the common case, not an edge one.
+  local dirty
+  dirty=$(git -C "$worktree_path" status --porcelain 2>/dev/null)
+  if [[ -n "$dirty" ]]; then
+    echo "$(red "⚠") Worktree still has uncommitted work:" >&2
+    printf '%s\n' "$dirty" | sed 's/^/    /' >&2
+    echo "  Commit it, stash it, or delete the files, then close the session." >&2
+    echo "  $(dim "Untracked files count: they are not in any commit and would be lost.")" >&2
     exit 1
   fi
 
@@ -1062,9 +1070,15 @@ Run this from inside a session worktree, or use 'claude-team branch done' for no
   tmp_commit "$tmp" "$BRANCHES_INDEX"
   lock_release
 
-  # Remove worktree (must be called from outside the worktree)
-  git -C "$repo_root" worktree remove "$worktree_path" 2>/dev/null \
-    || git -C "$repo_root" worktree remove "$worktree_path" --force
+  # Remove the worktree (git requires this from outside it). No --force
+  # fallback: git refuses to remove a worktree holding modified or untracked
+  # files, which is the same protection as the guard above, and retrying with
+  # --force overrode it unconditionally. Anything git blocks here is a state the
+  # guard should have caught, so surface it instead of forcing through it.
+  git -C "$repo_root" worktree remove "$worktree_path" \
+    || die "git refused to remove the worktree at $worktree_path.
+The branch index already records this session as merged. Inspect the worktree,
+then remove it with: git -C $repo_root worktree remove --force $worktree_path"
 
   echo ""
   echo "$(green "✓") Session closed: $(bold "$branch")"

@@ -585,18 +585,32 @@ if [[ -d "$STAGED_WT" ]]; then ok "worktree survives a refused session done (sta
 else fail "worktree survives a refused session done (staged new file)"; fi
 rm -rf "$STAGED_REPO"
 
-# KNOWN GAP, reported and deliberately not fixed here: production code needs
-# sign-off. An UNTRACKED file is invisible to both 'git diff' and 'git diff
-# --cached', so it passes the guard above unnoticed, and 'git worktree remove'
-# -- which does refuse to remove a worktree containing an untracked file --
-# is silently overridden two lines later in cmd_session_done by an
-# unconditional '|| ... --force' fallback. Net effect: session done deletes
-# untracked work with no warning and exit 0. Reproduced and reported to the
-# user with the exact lines; not asserted here because it would fail against
-# the current code and fixing bin/claude-team is not this suite's call to
-# make. Add this once fixed:
-#   printf 'precious\n' > "$WT/untracked.txt"; session done; assert the
-#   command exits nonzero AND the worktree (and the file) survive.
+# Untracked new file. This is the case that lost data: 'git diff' and 'git diff
+# --cached' are both blind to a file that was never added, so it passed the
+# guard, and the '|| ... --force' fallback then overrode git's own refusal to
+# remove a worktree holding untracked files. The worktree was deleted, the file
+# with it, exit 0, and the index recorded the branch as merged. Writing a file
+# and not staging it yet is the most ordinary state in a working session, so
+# this was the common path, not an edge case.
+UNTRACKED_REPO=$(mktemp -d)
+git init -q "$UNTRACKED_REPO"
+git -C "$UNTRACKED_REPO" commit -q --allow-empty -m init
+(cd "$UNTRACKED_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/uncommitted-untracked >/dev/null 2>&1)
+UNTRACKED_WT="$SESSION_WORKTREES/$(basename "$UNTRACKED_REPO")/feat-uncommitted-untracked"
+printf 'irreplaceable\n' > "$UNTRACKED_WT/untracked.txt"
+if (cd "$UNTRACKED_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" >/dev/null 2>&1); then
+  fail "session done refuses an untracked new file"
+else
+  ok "session done refuses an untracked new file"
+fi
+if [[ -f "$UNTRACKED_WT/untracked.txt" ]]; then ok "untracked work survives a refused session done"
+else fail "untracked work survives a refused session done (THE FILE WAS DELETED)"; fi
+if [[ -d "$UNTRACKED_WT" ]]; then ok "worktree survives a refused session done (untracked new file)"
+else fail "worktree survives a refused session done (untracked new file)"; fi
+# The refusal must name the offending file, or the user cannot act on it.
+out=$( (cd "$UNTRACKED_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" 2>&1) || true)
+assert_contains "the refusal names the untracked file" "untracked.txt" "$out"
+rm -rf "$UNTRACKED_REPO"
 echo ""
 
 # Shared-state concurrency. ~/.claude/branches/INDEX.md and ~/.claude/CLAUDE.md
@@ -957,11 +971,21 @@ assert_file_lacks "installer no longer claims the team is ready" "$REPO_DIR/inst
 echo ""
 
 # install.sh end to end into an isolated HOME: files land where the CLI
-# expects them, and the coordinator prompt delegates to the CLI code path
+# expects them, and the coordinator prompt delegates to the CLI code path.
+#
+# Runs from a throwaway copy of the repo, never from REPO_DIR. install.sh
+# delegates to 'claude-team sync', which resolves its repo directory from the
+# CLI's own path and regenerates agents/ and commands/ there. Run against the
+# real clone, the suite rewrote its own tracked files: a genuine drift would
+# fail the regeneration check earlier in this file and then be silently
+# repaired here, so a second run came back green with nothing fixed.
 echo "install.sh"
 
+INSTALL_REPO=$(mktemp -d)
+cp -R "$REPO_DIR"/profiles "$REPO_DIR"/commands "$REPO_DIR"/agents \
+      "$REPO_DIR"/scripts "$REPO_DIR"/bin "$REPO_DIR"/install.sh "$INSTALL_REPO/"
 INSTALL_HOME=$(mktemp -d)
-if (cd "$REPO_DIR" && echo "n" | HOME="$INSTALL_HOME" bash install.sh >/dev/null 2>&1); then
+if (cd "$INSTALL_REPO" && echo "n" | HOME="$INSTALL_HOME" bash install.sh >/dev/null 2>&1); then
   ok "install.sh runs clean with coordinator skipped"
 else
   fail "install.sh runs clean with coordinator skipped"
@@ -979,7 +1003,7 @@ else
   fail "install.sh skips coordinator when told no"
 fi
 
-if (cd "$REPO_DIR" && echo "prod" | HOME="$INSTALL_HOME" bash install.sh >/dev/null 2>&1); then
+if (cd "$INSTALL_REPO" && echo "prod" | HOME="$INSTALL_HOME" bash install.sh >/dev/null 2>&1); then
   ok "install.sh runs clean with coordinator prod"
 else
   fail "install.sh runs clean with coordinator prod"
@@ -993,7 +1017,7 @@ if [[ "$hookrefs" == "1" ]]; then
 else
   fail "reinstall does not duplicate the SessionStart hook (found $hookrefs)"
 fi
-rm -rf "$INSTALL_HOME"
+rm -rf "$INSTALL_HOME" "$INSTALL_REPO"
 
 echo ""
 
