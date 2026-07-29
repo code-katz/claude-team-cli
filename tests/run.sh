@@ -265,6 +265,44 @@ assert_exits_nonzero "use without name exits nonzero" "$CLI" use
 assert_exits_nonzero "show without name exits nonzero" "$CLI" show
 echo ""
 
+# A profiles directory that does not exist at all -- a fresh machine, a typo'd
+# CLAUDE_TEAM_PROFILES, a clone moved without a resync -- is a real, plausible
+# state, previously untested on any command. require_profiles_dir guards only
+# cmd_list; show, use, and launch all fall through to resolve_name's plain "no
+# profile found" message instead, which is misleading here (it points at
+# 'claude-team list', which would also fail, with a different message) but
+# still exits nonzero and writes nothing. That fail-safe behavior, not the
+# wording, is what this pins; assert_exits_nonzero is not reused here because
+# it hardcodes the real PROFILES_DIR, and this needs a missing one instead.
+echo "profiles directory entirely missing"
+
+NO_PROFILES="$(mktemp -d)/does-not-exist"
+NOPROF_HOME=$(mktemp -d)
+if CLAUDE_TEAM_PROFILES="$NO_PROFILES" HOME="$NOPROF_HOME" "$CLI" list >/dev/null 2>&1; then
+  fail "list fails safely when the profiles dir is missing"
+else
+  ok "list fails safely when the profiles dir is missing"
+fi
+if CLAUDE_TEAM_PROFILES="$NO_PROFILES" HOME="$NOPROF_HOME" "$CLI" show robin >/dev/null 2>&1; then
+  fail "show fails safely when the profiles dir is missing"
+else
+  ok "show fails safely when the profiles dir is missing"
+fi
+if CLAUDE_TEAM_PROFILES="$NO_PROFILES" HOME="$NOPROF_HOME" "$CLI" use robin >/dev/null 2>&1; then
+  fail "use fails safely when the profiles dir is missing"
+else
+  ok "use fails safely when the profiles dir is missing"
+fi
+if CLAUDE_TEAM_PROFILES="$NO_PROFILES" HOME="$NOPROF_HOME" "$CLI" launch robin --dry-run >/dev/null 2>&1; then
+  fail "launch fails safely when the profiles dir is missing"
+else
+  ok "launch fails safely when the profiles dir is missing"
+fi
+assert_file_lacks "a failed use writes nothing to CLAUDE.md when the profiles dir is missing" \
+  "$NOPROF_HOME/.claude/CLAUDE.md" "CLAUDE-TEAM:START"
+rm -rf "$NOPROF_HOME"
+echo ""
+
 # content preservation: use/reset and coordinator on/off must round-trip the
 # user's own CLAUDE.md byte-for-byte (leading blanks and trailing spaces
 # included), and must not leave a stray trailing blank line behind.
@@ -389,6 +427,27 @@ if [[ -x "$_hook" ]]; then ok "branch guard hook is executable"; else fail "bran
 if grep -q "claude-team" "$_hook" 2>/dev/null; then ok "branch guard hook has claude-team marker"; else fail "branch guard hook has claude-team marker"; fi
 (cd "$GUARD_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" branch guard remove >/dev/null 2>&1)
 if [[ ! -f "$_hook" ]]; then ok "branch guard remove deletes hook"; else fail "branch guard remove deletes hook"; fi
+
+# install must refuse to clobber a pre-commit hook it did not create, rather
+# than overwrite someone's own hook silently. Compared as files, not as a
+# command-substitution string: $(cat ...) strips the trailing newline that
+# printf wrote, so a string comparison against it fails even when the file on
+# disk is byte-for-byte untouched.
+_foreign_hook_src="$TEST_HOME/foreign-hook-fixture"
+printf '#!/bin/sh\necho "pre-existing custom hook"\n' > "$_foreign_hook_src"
+cp "$_foreign_hook_src" "$_hook"
+chmod +x "$_hook"
+if (cd "$GUARD_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" branch guard install >/dev/null 2>&1); then
+  fail "branch guard install refuses to overwrite a foreign hook"
+else
+  ok "branch guard install refuses to overwrite a foreign hook"
+fi
+if cmp -s "$_hook" "$_foreign_hook_src"; then
+  ok "branch guard install leaves the foreign hook untouched"
+else
+  fail "branch guard install leaves the foreign hook untouched"
+fi
+rm -f "$_foreign_hook_src"
 rm -rf "$GUARD_REPO"
 echo ""
 
@@ -462,7 +521,82 @@ if [[ -d "$SESSION_WT3" ]]; then ok "session start handles metachar branch name"
 assert_file_has "session done marks metachar branch merged" "$SESSION_INDEX" "feat/(v1\.2\.3).*merged"
 if [[ ! -d "$SESSION_WT3" ]]; then ok "session done removes metachar worktree"; else fail "session done removes metachar worktree"; fi
 
+# session start reuses an EXISTING local branch instead of creating a new one
+# from the default branch. The reused branch is given its own commit,
+# diverged from the default branch, so the test can tell "reused" apart from
+# "recreated fresh from default": without the divergence the two look
+# identical whenever they happen to start at the same commit.
+_reuse_parent=$(git -C "$SESSION_REPO" rev-parse HEAD)
+_reuse_tree=$(git -C "$SESSION_REPO" rev-parse "HEAD^{tree}")
+_reuse_commit=$(git -C "$SESSION_REPO" commit-tree "$_reuse_tree" -p "$_reuse_parent" -m "diverge for reuse test")
+git -C "$SESSION_REPO" branch feat/reuse-existing "$_reuse_commit" >/dev/null 2>&1
+(cd "$SESSION_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/reuse-existing >/dev/null 2>&1)
+SESSION_WT4="$SESSION_WORKTREES/$(basename "$SESSION_REPO")/feat-reuse-existing"
+if [[ -d "$SESSION_WT4" ]]; then ok "session start reuses an existing local branch"; else fail "session start reuses an existing local branch"; fi
+if [[ "$(git -C "$SESSION_WT4" rev-parse HEAD 2>/dev/null)" == "$_reuse_commit" ]]; then
+  ok "reused branch keeps its own commit, not a fresh one from the default branch"
+else
+  fail "reused branch keeps its own commit, not a fresh one from the default branch"
+fi
+(cd "$SESSION_WT4" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" >/dev/null 2>&1)
+
 rm -rf "$SESSION_REPO"
+echo ""
+
+# session done: uncommitted changes guard. This is the one check standing
+# between "close a session" and permanently deleting whatever is in its
+# worktree: cmd_session_done removes the worktree once it passes. It was
+# entirely untested in either direction before this block -- not proven to
+# block when it should, not proven to let a clean session through.
+echo "session done: uncommitted changes guard"
+
+# Modified TRACKED file: 'git diff' (unstaged) must catch it.
+UNCOM_REPO=$(mktemp -d)
+git init -q "$UNCOM_REPO"
+printf 'orig\n' > "$UNCOM_REPO/tracked.txt"
+git -C "$UNCOM_REPO" add tracked.txt
+git -C "$UNCOM_REPO" commit -q -m init
+(cd "$UNCOM_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/uncommitted-tracked >/dev/null 2>&1)
+UNCOM_WT="$SESSION_WORKTREES/$(basename "$UNCOM_REPO")/feat-uncommitted-tracked"
+printf 'modified\n' > "$UNCOM_WT/tracked.txt"
+if (cd "$UNCOM_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" >/dev/null 2>&1); then
+  fail "session done refuses a modified tracked file"
+else
+  ok "session done refuses a modified tracked file"
+fi
+if [[ -d "$UNCOM_WT" ]]; then ok "worktree survives a refused session done (modified tracked file)"
+else fail "worktree survives a refused session done (modified tracked file)"; fi
+rm -rf "$UNCOM_REPO"
+
+# Staged new file: 'git diff --cached' must catch it.
+STAGED_REPO=$(mktemp -d)
+git init -q "$STAGED_REPO"
+git -C "$STAGED_REPO" commit -q --allow-empty -m init
+(cd "$STAGED_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session start feat/uncommitted-staged >/dev/null 2>&1)
+STAGED_WT="$SESSION_WORKTREES/$(basename "$STAGED_REPO")/feat-uncommitted-staged"
+printf 'new\n' > "$STAGED_WT/staged.txt"
+git -C "$STAGED_WT" add staged.txt
+if (cd "$STAGED_WT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" session "done" >/dev/null 2>&1); then
+  fail "session done refuses a staged new file"
+else
+  ok "session done refuses a staged new file"
+fi
+if [[ -d "$STAGED_WT" ]]; then ok "worktree survives a refused session done (staged new file)"
+else fail "worktree survives a refused session done (staged new file)"; fi
+rm -rf "$STAGED_REPO"
+
+# KNOWN GAP, reported and deliberately not fixed here: production code needs
+# sign-off. An UNTRACKED file is invisible to both 'git diff' and 'git diff
+# --cached', so it passes the guard above unnoticed, and 'git worktree remove'
+# -- which does refuse to remove a worktree containing an untracked file --
+# is silently overridden two lines later in cmd_session_done by an
+# unconditional '|| ... --force' fallback. Net effect: session done deletes
+# untracked work with no warning and exit 0. Reproduced and reported to the
+# user with the exact lines; not asserted here because it would fail against
+# the current code and fixing bin/claude-team is not this suite's call to
+# make. Add this once fixed:
+#   printf 'precious\n' > "$WT/untracked.txt"; session done; assert the
+#   command exits nonzero AND the worktree (and the file) survive.
 echo ""
 
 # Shared-state concurrency. ~/.claude/branches/INDEX.md and ~/.claude/CLAUDE.md
@@ -556,18 +690,28 @@ echo ""
 # launch + plugin surfaces
 echo "launch + plugin surfaces"
 
+# Tier assertions alone do not prove WHICH profile launch resolved: the model
+# comes from a separate tiers.conf lookup keyed on the same name, so a launch
+# that silently loaded the wrong persona's profile (a copy-paste bug, a stale
+# alias table, anything that decouples the two lookups) would still show the
+# right tier. Pin the printed --append-system-prompt-file path to the
+# requested persona's own file too.
 out=$(run_cmd launch akira --dry-run 2>&1)
 assert_contains "launch akira defaults to fable tier" "claude-fable-5" "$out"
 assert_contains "launch dry-run shows append-system-prompt-file" "append-system-prompt-file" "$out"
+assert_contains "launch akira points at akira's own profile" "$PROFILES_DIR/akira\.md" "$out"
 
 out=$(run_cmd launch robin --dry-run 2>&1)
 assert_contains "launch robin defaults to sonnet tier" "claude-sonnet-5" "$out"
+assert_contains "launch robin points at robin's own profile" "$PROFILES_DIR/robin\.md" "$out"
 
 out=$(run_cmd launch sage --dry-run 2>&1)
 assert_contains "launch sage defaults to fable tier" "claude-fable-5" "$out"
+assert_contains "launch sage points at sage's own profile" "$PROFILES_DIR/sage\.md" "$out"
 
 out=$(run_cmd launch toni --dry-run 2>&1)
 assert_contains "launch toni defaults to opus tier" "claude-opus-4-8" "$out"
+assert_contains "launch toni points at toni's own profile" "$PROFILES_DIR/toni\.md" "$out"
 
 out=$(run_cmd launch akira --model claude-haiku-4-5 --dry-run 2>&1)
 assert_contains "launch --model overrides tier default" "claude-haiku-4-5" "$out"
@@ -577,6 +721,58 @@ assert_contains "launch --task appends initial prompt" "review.*auth.*flow" "$ou
 
 out=$(run_cmd launch nobody --dry-run 2>&1) || true
 assert_contains "launch unknown persona errors" "No profile found" "$out"
+echo ""
+
+# launch --worktree: creates the session's worktree on demand, then execs
+# inside it. Before this block, no test -- dry-run or real -- exercised the
+# flag at all. A stub 'claude' placed first on PATH captures the real
+# (non-dry-run) exec so the worktree-creation side effect and the final argv
+# can both be checked, without ever invoking the real Claude Code CLI.
+echo "launch --worktree"
+
+LAUNCH_NOGIT=$(mktemp -d)
+if (cd "$LAUNCH_NOGIT" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" launch akira --worktree feat/x --dry-run >/dev/null 2>&1); then
+  fail "launch --worktree outside a git repo dies"
+else
+  ok "launch --worktree outside a git repo dies"
+fi
+rm -rf "$LAUNCH_NOGIT"
+
+LAUNCH_REPO=$(mktemp -d)
+git init -q "$LAUNCH_REPO"
+git -C "$LAUNCH_REPO" commit -q --allow-empty -m init
+LAUNCH_WT="$TEST_HOME/.claude/worktrees/$(basename "$LAUNCH_REPO")/feat-launch-wt"
+
+out=$(cd "$LAUNCH_REPO" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" launch akira --worktree feat/launch-wt --dry-run 2>&1)
+assert_contains "launch --worktree dry-run reports the worktree would be created" "would create worktree" "$out"
+assert_contains "launch --worktree dry-run targets the worktree dir, not \$PWD" "$LAUNCH_WT" "$out"
+if [[ -d "$LAUNCH_WT" ]]; then fail "launch --worktree dry-run has no side effect"; else ok "launch --worktree dry-run has no side effect"; fi
+
+FAKE_CLAUDE_DIR=$(mktemp -d)
+cat > "$FAKE_CLAUDE_DIR/claude" <<'STUB'
+#!/usr/bin/env bash
+echo "FAKE-CLAUDE-INVOKED cwd=$PWD"
+printf 'FAKE-CLAUDE-ARG: %s\n' "$@"
+STUB
+chmod +x "$FAKE_CLAUDE_DIR/claude"
+
+out=$(cd "$LAUNCH_REPO" && PATH="$FAKE_CLAUDE_DIR:$PATH" CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" launch akira --worktree feat/launch-wt 2>&1)
+assert_contains "launch --worktree really creates the worktree and execs there" "FAKE-CLAUDE-INVOKED cwd=$LAUNCH_WT" "$out"
+assert_contains "launch --worktree execs with the requested persona's profile" "FAKE-CLAUDE-ARG: $PROFILES_DIR/akira.md" "$out"
+
+# A second launch for the same branch must reuse the worktree already made,
+# not call session start again -- that would hit "already has an active
+# session" and die, taking the whole launch down with it.
+if out2=$(cd "$LAUNCH_REPO" && PATH="$FAKE_CLAUDE_DIR:$PATH" CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TEST_HOME" "$CLI" launch akira --worktree feat/launch-wt 2>&1); then
+  ok "launch --worktree reuses an existing worktree on a second call"
+else
+  fail "launch --worktree reuses an existing worktree on a second call"
+fi
+assert_contains "reused launch --worktree still execs in the same worktree" "FAKE-CLAUDE-INVOKED cwd=$LAUNCH_WT" "$out2"
+assert_count "launch --worktree registers the branch exactly once" "$BRANCHES_INDEX" "feat/launch-wt" 1
+
+rm -rf "$LAUNCH_REPO" "$FAKE_CLAUDE_DIR"
+echo ""
 
 if command -v python3 >/dev/null 2>&1; then
   if python3 -c "import json; json.load(open('$REPO_DIR/.claude-plugin/plugin.json'))" 2>/dev/null; then
@@ -589,6 +785,14 @@ if command -v python3 >/dev/null 2>&1; then
   else
     fail "hooks.json is valid and registers SessionStart"
   fi
+else
+  # A silent 'if command -v python3' guard with no else shrinks PASS+FAIL by
+  # two on a python3-less machine with no indication why: the count just
+  # differs from what CI reports, and nothing says these two checks did not
+  # run. Both CI runners ship python3, so this branch never fires there; it
+  # exists so a contributor on a minimal local machine sees a reason instead
+  # of a smaller, unexplained number.
+  printf "  \033[33m!\033[0m skipped (no python3): plugin.json / hooks.json JSON validity\n"
 fi
 
 agent_files=("$REPO_DIR"/agents/*.md)
@@ -599,43 +803,50 @@ assert_contains "akira agent carries model tier" "model: claude-fable-5" "$(cat 
 assert_contains "iris agent carries model tier" "model: claude-opus-4-8" "$(cat "$REPO_DIR/agents/iris.md")"
 assert_contains "agents marked as generated" "GENERATED from profiles" "$(cat "$REPO_DIR/agents/robin.md")"
 
-# Regeneration drift: CI never runs generate-agents.sh, and the count check above
-# only counts files. generate-agents.sh copies the profile into the agent verbatim
-# except for the ## Greeting section, which belongs to the slash command. So every
-# non-blank profile line above ## Greeting must appear verbatim in its agent.
-# Catches a profile edited without regenerating.
+# Regeneration drift. CI never runs generate-agents.sh by hand, so a profile
+# edited without a resync, or a generated file hand-edited independent of its
+# profile, must be caught here.
+#
+# The previous check re-implemented the generator's own stripping logic a
+# second time, by hand, in this file, to predict what each generated file
+# should contain, then tested that the profile's text was a SUBSET of it. Two
+# things follow from "subset": extra or wrong content the generator (or a
+# stray hand-edit) adds is invisible to it, and the prediction has to be kept
+# in sync with the generator by hand forever. That second property is what let
+# this same check assert a missing Handoff Brief section as correct: its
+# hand-written awk mirrored the generator's own bug instead of the
+# requirement.
+#
+# This regenerates every agent and slash command from the committed profiles
+# into a scratch tree with the real generator, then diffs each one against the
+# committed copy. It catches both directions of drift and cannot mirror a bug
+# the generator does not have, because it IS the generator, not a second
+# implementation of it. What it structurally cannot catch is the opposite
+# failure: a generator whose transform is wrong but internally consistent, so
+# a fresh regeneration reproduces the same wrong output already committed.
+# That needs a content assertion instead, which is what the Handoff Brief
+# presence checks below are.
+REGEN_DIR=$(mktemp -d)
+cp -R "$REPO_DIR"/profiles "$REPO_DIR"/scripts "$REGEN_DIR/"
+if bash "$REGEN_DIR/scripts/generate-agents.sh" >/dev/null 2>&1; then
+  ok "generate-agents.sh runs clean against the committed profiles"
+else
+  fail "generate-agents.sh runs clean against the committed profiles"
+fi
 stale=""
 for profile in "$REPO_DIR"/profiles/*.md; do
   pname=$(basename "$profile" .md)
   case "$pname" in coordinator*) continue ;; esac
-  agent="$REPO_DIR/agents/$pname.md"
-  if [[ ! -f "$agent" ]]; then stale="$stale $pname(no-agent)"; continue; fi
-  drift=$(awk '/^## Greeting$/ { exit } { print }' "$profile" \
-      | grep -v '^[[:space:]]*$' | grep -F -x -v -c -f "$agent" - || true)
-  [[ "$drift" == "0" ]] || stale="$stale $pname($drift)"
+  if ! diff -q "$REPO_DIR/agents/$pname.md" "$REGEN_DIR/agents/$pname.md" >/dev/null 2>&1; then
+    stale="$stale $pname(agent)"
+  fi
+  if ! diff -q "$REPO_DIR/commands/$pname.md" "$REGEN_DIR/commands/$pname.md" >/dev/null 2>&1; then
+    stale="$stale $pname(command)"
+  fi
 done
-if [[ -z "$stale" ]]; then ok "generated agents match their profiles"
-else fail "generated agents match their profiles (stale:$stale)"; fi
-
-# Same drift check for commands/, which generate-agents.sh derives from the same
-# profile: Required Interactive Behaviors excised, and the ## Greeting heading
-# replaced by its sentence as the trailer. So every non-blank profile line outside
-# those two sections, plus the greeting sentence, must appear verbatim in the
-# slash command. The excised range ends at ## Handoff Brief, not ## Signature
-# Question, so the brief survives; this awk must track the stripper exactly.
-cdrift=""
-for profile in "$REPO_DIR"/profiles/*.md; do
-  pname=$(basename "$profile" .md)
-  case "$pname" in coordinator*) continue ;; esac
-  cmd="$REPO_DIR/commands/$pname.md"
-  if [[ ! -f "$cmd" ]]; then cdrift="$cdrift $pname(no-command)"; continue; fi
-  d=$(awk '/^## Required Interactive Behaviors$/{skip=1} /^## Handoff Brief$/{skip=0}
-           /^## Greeting$/{next} !skip' "$profile" \
-      | grep -v '^[[:space:]]*$' | grep -F -x -v -c -f "$cmd" - || true)
-  [[ "$d" == "0" ]] || cdrift="$cdrift $pname($d)"
-done
-if [[ -z "$cdrift" ]]; then ok "generated commands match their profiles"
-else fail "generated commands match their profiles (drift:$cdrift)"; fi
+if [[ -z "$stale" ]]; then ok "generated agents and commands match a fresh regeneration"
+else fail "generated agents and commands match a fresh regeneration (stale:$stale)"; fi
+rm -rf "$REGEN_DIR"
 
 # The greeting is a persona-switch line ("Greet the user briefly as Robin"). A
 # delegated subagent never switches the session, so it must not carry one.
