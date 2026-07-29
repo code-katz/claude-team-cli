@@ -913,7 +913,7 @@ The `0.4` through `0.7` numbers used during development are retired. v1 is the f
 - `claude-team sync` propagates a profile edit to all three installed copies
 - `claude-team install-hook` registers session context on the clone install path
 - Plain technical English standard for the six coding specialists ([WRITING.md](WRITING.md))
-- 175-test suite covering the CLI commands, both coordinator modes, and the install path
+- 223-test suite covering the CLI commands, both coordinator modes, and the install path
 
 ### v1.0
 
