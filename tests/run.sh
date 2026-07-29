@@ -842,10 +842,19 @@ else
   printf "  \033[33m!\033[0m skipped (no python3): plugin.json / hooks.json JSON validity\n"
 fi
 
+# Count the personas rather than hardcoding a number. A literal 17 here would
+# make every roster assertion below fail the day an eighteenth persona lands,
+# which is the same hand-maintained-list problem these tests exist to catch.
+PERSONA_COUNT=0
+for _p in "$REPO_DIR"/profiles/*.md; do
+  case "$(basename "$_p" .md)" in coordinator*) continue ;; esac
+  PERSONA_COUNT=$((PERSONA_COUNT + 1))
+done
 agent_files=("$REPO_DIR"/agents/*.md)
 agent_count=${#agent_files[@]}
 [[ -e "${agent_files[0]}" ]] || agent_count=0
-if [[ "$agent_count" == "17" ]]; then ok "17 persona subagents generated"; else fail "17 persona subagents generated (got $agent_count)"; fi
+if [[ "$agent_count" == "$PERSONA_COUNT" ]]; then ok "every persona has a generated subagent"
+else fail "every persona has a generated subagent (expected $PERSONA_COUNT, got $agent_count)"; fi
 assert_contains "akira agent carries model tier" "model: claude-fable-5" "$(cat "$REPO_DIR/agents/akira.md")"
 assert_contains "iris agent carries model tier" "model: claude-opus-4-8" "$(cat "$REPO_DIR/agents/iris.md")"
 assert_contains "agents marked as generated" "GENERATED from profiles" "$(cat "$REPO_DIR/agents/robin.md")"
@@ -910,11 +919,11 @@ fi
 # surfaces must carry it.
 hcount=$(grep -l '^## Handoff Brief$' "$REPO_DIR"/commands/*.md 2>/dev/null | wc -l | tr -d ' ')
 assert_count_eq() { if [[ "$2" == "$3" ]]; then ok "$1"; else fail "$1 (expected $3, got $2)"; fi; }
-assert_count_eq "every slash command carries the handoff brief" "$hcount" "17"
+assert_count_eq "every slash command carries the handoff brief" "$hcount" "$PERSONA_COUNT"
 hcount=$(grep -l '^## Handoff Brief$' "$REPO_DIR"/agents/*.md 2>/dev/null | wc -l | tr -d ' ')
-assert_count_eq "every subagent still carries the handoff brief" "$hcount" "17"
+assert_count_eq "every subagent still carries the handoff brief" "$hcount" "$PERSONA_COUNT"
 hcount=$(grep -l '^## Handoff Brief$' "$REPO_DIR"/profiles/*.md 2>/dev/null | wc -l | tr -d ' ')
-assert_count_eq "every persona profile defines a handoff brief" "$hcount" "17"
+assert_count_eq "every persona profile defines a handoff brief" "$hcount" "$PERSONA_COUNT"
 run_cmd use akira >/dev/null 2>&1
 assert_file_has "use carries the handoff brief into the global pin" "$CLAUDE_MD" "^## Handoff Brief"
 run_cmd reset >/dev/null 2>&1
