@@ -22,7 +22,7 @@ v1 delivered the roster and the coordinator. v2 closes the gaps that made the te
 - [x] `claude-team install-hook` — the SessionStart hook now registers on the `install.sh` path, not only the plugin path
 - [x] Plain technical English standard for the six coding specialists, documented in [WRITING.md](WRITING.md)
 - [x] Slash commands generated from profiles, so a new persona means writing one file instead of three
-- [x] 136-test suite covering the CLI commands, both coordinator modes, and the install path
+- [x] 170-test suite covering the CLI commands, both coordinator modes, and the install path
 
 ### Shipped — v1.0
 
@@ -40,7 +40,9 @@ v1 delivered the roster and the coordinator. v2 closes the gaps that made the te
 
 ### Near-Term
 
-**Local profile overrides** is the highest-value unbuilt item on this list. Details in the section below.
+**Local profile overrides are retired, not deferred.** They were the top item here through v2. Building them would create a second source of persona truth competing with the repo, and the confusion between core version and local customization costs more than the convenience buys. Team-scoped profiles (`claude-team init` writing `.claude-team/`) are retired for the same reason at project scope.
+
+Customizing a persona has two supported paths, both of which keep one source of truth: open a pull request so everyone gets the improvement, or fork and own your copy. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Slash command generation shipped in v2.0 and is no longer queued. `scripts/generate-agents.sh` now writes both the delegation subagent and the `/name` slash command from the profile, so adding a persona means writing one profile.
 
@@ -49,14 +51,6 @@ Slash command generation shipped in v2.0 and is no longer queued. `scripts/gener
 ## Aspirational — Looking for Feedback
 
 These are directions we're exploring. If any of them would change how you use the tool, [open an issue](https://github.com/code-katz/claude-team-cli/issues). Real usage feedback shapes what gets built next.
-
-**Local profile overrides (top priority)**
-A `~/.claude/team/local/` directory for per-user customizations without forking the repo. Override any persona's behavior for your specific workflow without touching the upstream source.
-
-This moved from "exploring" to "next thing we want to build" during v2. `claude-team sync` fixed the symptom, which was an edit landing in one installed copy out of three. It did not fix the cause: the only place to customize a persona is a tracked file that the next `git pull` overwrites. Until overrides exist, "make Akira work the way my team works" is something you have to redo after every update. Customizing the team is the whole point of the product, so this is the gap worth closing first.
-
-**Team-scoped profiles**
-`claude-team init` creates a `.claude-team/` config at the project root, so team conventions are shared across developers on the same repo. Consistent team member behaviors without everyone managing their own `~/.claude/team/` independently.
 
 **Session handoff briefing**
 When switching team members mid-task, the coordinator generates a structured briefing so the incoming specialist doesn't start cold: decisions made this session, open questions, and a direct question addressed to the new team member by name.
@@ -69,3 +63,4 @@ When switching team members mid-task, the coordinator generates a structured bri
 |---|---|---|
 | 2026-04-09 | snapshot | Initial ROADMAP.md — v0.6 shipping, aspirational backlog identified |
 | 2026-07-29 | snapshot | Renumbered to v2.0 current, v1.0 shipped; pre-release `0.x` numbers retired. Corrected test count to 135. Local profile overrides promoted to top priority. |
+| 2026-07-29 | decision | Local profile overrides and team-scoped profiles retired. Both create a second source of persona truth competing with the repo. Supported paths are a pull request or a fork, documented in CONTRIBUTING.md. |

@@ -118,7 +118,12 @@ case "$(echo "$coord_answer" | tr '[:upper:]' '[:lower:]')" in
 esac
 
 echo ""
-echo "$(bold "Done!") Your Claude dev team is ready."
+echo "$(bold "Done!") Your Claude dev team is installed."
+echo ""
+# "ready" overstated it: the subagents, the SessionStart hook, and the
+# coordinator all wait for a new session. Only the slash commands are live.
+echo "$(yellow "→") $(bold "Start a new Claude Code session") to activate the subagents, the"
+echo "  SessionStart hook, and the coordinator. Slash commands work right now."
 echo ""
 echo "Quick start:"
 echo "  claude-team list                   $(dim "# see your team")"
