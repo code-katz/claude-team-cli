@@ -137,6 +137,33 @@ assert_contains "case-insensitive show"     "Robin — QA" "$out"
 assert_exits_nonzero "invalid name exits nonzero" "$CLI" show nobody
 echo ""
 
+# A profile name is an identifier, not a path. resolve_name is the single choke
+# point for show, use, and launch. '../gtm' is the regression target because
+# $PROFILES_DIR/../gtm.md genuinely exists and is lowercase, so it resolved
+# before the fix. Traversal read nothing the caller could not already cat, but
+# it let a non-profile reach the global pin and printed a success line with an
+# empty name.
+echo "name validation"
+# Guard the guard: if gtm.md ever moves, every assertion below would pass for
+# the wrong reason, because the traversal would resolve to nothing either way.
+if [[ -f "$REPO_DIR/gtm.md" ]]; then ok "traversal target exists, so these tests are not vacuous"
+else fail "traversal target exists, so these tests are not vacuous (gtm.md moved: repoint these tests)"; fi
+assert_exits_nonzero "show rejects traversal to a real file"   "$CLI" show ../gtm
+assert_exits_nonzero "use rejects traversal to a real file"    "$CLI" use ../gtm
+assert_exits_nonzero "launch rejects traversal to a real file" "$CLI" launch ../gtm --dry-run
+assert_exits_nonzero "show rejects a nested traversal"         "$CLI" show sub/../../gtm
+assert_exits_nonzero "show rejects a leading dash"             "$CLI" show -n
+assert_exits_nonzero "show rejects an empty name"              "$CLI" show ""
+out=$(run_cmd show ../gtm 2>&1 || true)
+assert_contains     "traversal reports an invalid name"      "Invalid profile name" "$out"
+assert_not_contains "traversal discloses no outside content" "Go-to-Market"         "$out"
+run_cmd use ../gtm >/dev/null 2>&1 || true
+assert_file_lacks "a rejected name never reaches the global pin" "$CLAUDE_MD" "Go-to-Market"
+# The character class must not be so tight that real names stop resolving.
+out=$(run_cmd show coordinator-prod)
+assert_contains "hyphenated name still resolves" "Claude Team CLI" "$out"
+echo ""
+
 # use — basic injection
 echo "use"
 run_cmd use robin >/dev/null
@@ -462,7 +489,7 @@ done
 # transforms it, and renames over it; an append landing inside that window is
 # erased by the rename, however atomic the append itself was.
 for i in 1 2 3 4; do
-  (cd "$CONC_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" branch done >/dev/null 2>&1) &
+  (cd "$CONC_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" branch "done" >/dev/null 2>&1) &
 done
 for i in 5 6 7 8; do
   (cd "$CONC_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$CONC_HOME" "$CLI" branch start "feat/c$i" >/dev/null 2>&1) &
@@ -506,14 +533,18 @@ git init -q "$TMP_REPO"
 run_notmp() {
   TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" "$@"
 }
-for spec in "use akira:use" "reset:reset" "coordinator on:coordinator on"; do
-  if run_notmp ${spec%%:*} >/dev/null 2>&1; then ok "${spec##*:} works when TMPDIR is unusable"
-  else fail "${spec##*:} works when TMPDIR is unusable"; fi
-done
+if run_notmp use akira >/dev/null 2>&1; then ok "use works when TMPDIR is unusable"
+else fail "use works when TMPDIR is unusable"; fi
+if run_notmp reset >/dev/null 2>&1; then ok "reset works when TMPDIR is unusable"
+else fail "reset works when TMPDIR is unusable"; fi
+if run_notmp coordinator on >/dev/null 2>&1; then ok "coordinator on works when TMPDIR is unusable"
+else fail "coordinator on works when TMPDIR is unusable"; fi
 if (cd "$TMP_REPO" && TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" branch start feat/notmp >/dev/null 2>&1); then
   ok "branch start works when TMPDIR is unusable"
 else fail "branch start works when TMPDIR is unusable"; fi
-if (cd "$TMP_REPO" && TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" branch done >/dev/null 2>&1); then
+# "done" is quoted throughout this suite so shellcheck does not read it as a
+# loop terminator (SC1010).
+if (cd "$TMP_REPO" && TMPDIR=/nonexistent-tmpdir CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$TMP_HOME" "$CLI" branch "done" >/dev/null 2>&1); then
   ok "branch done works when TMPDIR is unusable"
 else fail "branch done works when TMPDIR is unusable"; fi
 if [[ -z "$(find "$TMP_HOME" -name '.claude-team.*' 2>/dev/null)" ]]; then
