@@ -5,6 +5,56 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-29] v2 hardening: four specialists, a real race, and a lint I broke
+
+**Category:** `milestone`
+**Tags:** `concurrency`, `locking`, `codegen`, `security`, `versioning`, `dogfooding`, `delegation`
+
+**Risk Level:** `medium`
+**Breaking Change:** `no`
+
+### Summary
+
+An adversarial review of the codebase produced five findings. All five are fixed, each by the persona whose lane it sits in, working from the installed profiles rather than the repo copy. The suite went 136 to 163. The headline result: the parallel-sessions feature was silently losing data, and two of the four specialists found defects the review had missed.
+
+### Detail
+
+**Dogfooding was the precondition, not a nicety.** The team was cloned and installed through the documented path before any delegation. That validated the two install fixes shipped earlier the same day: the SessionStart hook registered itself in `~/.claude/settings.json`, and all three persona surfaces landed. It also surfaced a gap: Claude Code registers subagent types at session start, so seventeen freshly installed agents were invisible to the running session. The installer prints "Subagents installed (delegate with...)" as though they are live, while `install-commands` correctly states that slash commands need no restart. The one that needs a restart is the one that does not say so. The first round of delegation ran against profiles read from `~/.claude/team/` instead; the agent types appeared later in the session.
+
+**The race was real and worse than reported.** The review found that `cmd_branch_close` does a read-modify-write with no lock, and reasoned that the `>>` appends in `branch start` and `session start` were safe because POSIX makes an O_APPEND write atomic. Akira verified that reasoning, confirmed no row was ever torn, and then showed it was beside the point: an append landing between a rewriter's read and its rename is **erased** by that rename. Atomicity of an append says nothing about its survival. That is the load-bearing argument for locking the appenders too, and the review had explicitly waved it off. Measured at 40-way concurrency, five runs, every run lost data: 23 to 29 of 40 rows survived, 5 to 8 of 20 status updates applied.
+
+He also found a second failure mode nobody had looked for. `block_install` greps for its start marker, misses it against a concurrent write that has not landed, takes the append path, and writes a duplicate block. Two of five runs produced up to four `CLAUDE-TEAM` blocks in `CLAUDE.md`, after which `get_active` reads a corrupted awk range.
+
+**Verification beat reasoning, twice, in the same change.** Akira's first locking implementation treated "no owner record" as stale. Every live holder passes through that state for microseconds between its `mkdir` and its record write, so contenders broke live locks 73 times per run. It also treated "no lock directory" as stale, so contenders removed directories other contenders had just created. Neither was caught by review; both were caught by a harness built to look for them.
+
+**The commands generator closed a gap that had already bitten twice.** `commands/` was hand-maintained while being about 95 percent derivable, and the drift test already contained the transformation as a checker. Alex turned the checker into a generator. He also overruled the brief: offered a choice between extending `generate-agents.sh` and adding a sibling script, he extended it, because `claude-team sync` and `install.sh` both invoke that one script and a sibling would never run on either path, reopening the same gap one level down.
+
+**Two findings were correctly downgraded.** Morgan rated the path traversal Low, Informational as a vulnerability, and said so rather than inflating it: the CLI runs as the invoking user, reads with that user's permissions, and appends `.md`, so every reachable file is one the caller can already `cat`. He fixed it anyway on correctness grounds, because `use ../gtm` exited 0, printed a success line with an empty name, and pinned a non-profile into global state. He also checked `sanitize_branch_for_path`, found git's `check-ref-format` already rejects `..`, and left it alone on the grounds that a control reducing no risk is a liability.
+
+**The symlink finding was closed as working-as-intended.** If the clone moves, the CLI and hook break loudly, and loud is correct: the install genuinely is broken and `bash install.sh` repairs it. Silencing it would hide real breakage, and the symlink buys `git pull` updating the CLI with no reinstall.
+
+### Decisions Made
+
+- **A `mkdir` directory lock, not `flock` with a fallback.** `flock` is absent from stock macOS. A two-scheme design does not exclude itself, so any host with mixed invocations silently loses mutual exclusion, and the fallback would run only on the platform CI does not cover it. The accepted cost is owning liveness by hand: traps, a dead-PID rule, and a 120 second ceiling for the reboot case.
+- **Temp files are created beside their destination.** Not comment accuracy. A cross-device `mv` degrades to copy plus unlink, and a reader can observe a half-copied index during it, so this is what makes "readers need no lock" true.
+- **The greeting is excised from `use` but not from `launch`.** `use` pins a default that every future session reads; `launch` starts one session, which is the moment a greeting is for.
+- **Version numbering normalised to v2.0.0 with no fabricated v1 release.** The repository has no git tags, so v1 is presented as the first generation rather than a dated release. The April roadmap row still reads "v0.6 shipping" and stays verbatim: a dated changelog entry is not rewritten to match a later renumber.
+
+### Mistakes Worth Recording
+
+- **I broke CI lint and shipped it.** Commit `00b82aa` introduced three shellcheck findings in `tests/run.sh`, two of them a bare `done` read as a loop terminator. The rest of the suite already quotes `"done"` for exactly that reason, so the new code was the outlier against a convention already visible in the file. Morgan caught it while working in an adjacent file.
+- **Morgan's suggested fix for one of those was wrong.** Quoting `${spec%%:*}` would have passed `coordinator on` as a single argument and broken the test. The finding was right and the fix was not, which is the argument for verifying a subagent's patch rather than applying it.
+- **A control test passed for the wrong reason.** The first attempt to prove the traversal tests were meaningful ran against a scratch tree that did not contain `gtm.md`, so the traversal resolved to nothing and every assertion passed on unfixed code. The suite now asserts the traversal target exists before testing against it.
+- **A `git add` swept a running agent's work into an unrelated commit.** Morgan's `resolve_name` fix landed inside the locking commit. Harmless to the code, wrong for the history. Scoped `git add <paths>` is the rule while agents are live.
+
+### Related
+
+- PRs #19, #20, #21: the same-day work this builds on
+- `WRITING.md`: the plain technical English standard all four specialists wrote to
+- ROADMAP: local profile overrides, now top priority and still the real gap
+
+---
+
 ## [2026-07-29] claude-team sync: one command for the three-copy persona problem
 
 **Category:** `decision`
