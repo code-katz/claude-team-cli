@@ -545,6 +545,8 @@ if [[ -f "$INSTALL_HOME/.claude/team/tiers.conf" ]]; then ok "install.sh install
 if [[ -f "$INSTALL_HOME/.claude/commands/robin.md" ]]; then ok "install.sh installs slash commands"; else fail "install.sh installs slash commands"; fi
 if [[ -f "$INSTALL_HOME/.claude/agents/robin.md" ]]; then ok "install.sh installs subagents"; else fail "install.sh installs subagents"; fi
 if [[ -L "$INSTALL_HOME/.local/bin/claude-team" ]]; then ok "install.sh symlinks the CLI"; else fail "install.sh symlinks the CLI"; fi
+assert_file_has "install.sh registers the SessionStart hook" \
+  "$INSTALL_HOME/.claude/settings.json" "team-session-start"
 if ! grep -qF "CLAUDE-COORDINATOR:START" "$INSTALL_HOME/.claude/CLAUDE.md" 2>/dev/null; then
   ok "install.sh skips coordinator when told no"
 else
@@ -557,6 +559,14 @@ else
   fail "install.sh runs clean with coordinator prod"
 fi
 assert_file_has "install.sh prod answer installs prod coordinator" "$INSTALL_HOME/.claude/CLAUDE.md" "CLAUDE-COORD-MODE: prod"
+# install.sh above ran twice. The hook entry must be replaced, not stacked,
+# or a reinstall would fire the hook once per install ever run.
+hookrefs=$(grep -c "team-session-start" "$INSTALL_HOME/.claude/settings.json" 2>/dev/null || echo 0)
+if [[ "$hookrefs" == "1" ]]; then
+  ok "reinstall does not duplicate the SessionStart hook"
+else
+  fail "reinstall does not duplicate the SessionStart hook (found $hookrefs)"
+fi
 rm -rf "$INSTALL_HOME"
 
 echo ""

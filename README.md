@@ -656,7 +656,11 @@ bash install.sh
 This installs:
 - Team member profiles to `~/.claude/team/`
 - Slash commands to `~/.claude/commands/`
+- Delegation subagents to `~/.claude/agents/`
+- A `SessionStart` hook in `~/.claude/settings.json`, which injects worktree and branch context at the start of every session
 - The `claude-team` CLI to `~/.local/bin/` (symlinked, so repo updates apply immediately)
+
+Keep the clone. The CLI is a symlink into it and the hook points at it by absolute path, so moving or deleting the clone breaks both. Re-run `bash install.sh` after moving it, or just `claude-team install-hook` to re-point the hook.
 
 Make sure `~/.local/bin` is on your `PATH`:
 
