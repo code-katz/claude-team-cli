@@ -25,8 +25,9 @@ COORD_END="<!-- CLAUDE-COORDINATOR:END -->"
 
 bold()  { printf '\033[1m%s\033[0m' "$*"; }
 green() { printf '\033[32m%s\033[0m' "$*"; }
-dim()   { printf '\033[2m%s\033[0m' "$*"; }
-red()   { printf '\033[31m%s\033[0m' "$*"; }
+dim()    { printf '\033[2m%s\033[0m' "$*"; }
+red()    { printf '\033[31m%s\033[0m' "$*"; }
+yellow() { printf '\033[33m%s\033[0m' "$*"; }
 
 die() { echo "$(red "error:") $*" >&2; exit 1; }
 
@@ -897,6 +898,52 @@ cmd_session() {
   esac
 }
 
+# Regenerate agents from profiles, then copy all three installed surfaces from
+# the clone into ~/.claude. A persona exists as three self-contained files
+# (profile, slash command, subagent), so editing one installed copy leaves the
+# other two stale with nothing to warn you. install.sh delegates here so the
+# copy logic lives in one place and cannot drift from what users run.
+cmd_sync() {
+  local repo_dir gen commands_dst agents_dst
+  repo_dir="$(cd "$(dirname "$(readlink "$0" 2>/dev/null || echo "$0")")/.." && pwd)"
+  gen="$repo_dir/scripts/generate-agents.sh"
+  commands_dst="$HOME/.claude/commands"
+  agents_dst="$HOME/.claude/agents"
+
+  [[ -d "$repo_dir/profiles" ]] || die "Profiles directory not found: $repo_dir/profiles
+Make sure you are running this from the claude-team-cli repo."
+
+  echo ""
+  # Regenerate first: agents/ is derived from profiles/, so syncing without this
+  # would install subagents that lag the profile edit that prompted the sync.
+  if [[ -f "$gen" ]]; then
+    bash "$gen" >/dev/null || die "generate-agents.sh failed; nothing was synced."
+    echo "$(green "✓") Subagents regenerated from $(dim "$repo_dir/profiles")"
+  else
+    echo "$(yellow "!") $gen not found; syncing the existing agents unchanged."
+  fi
+
+  mkdir -p "$PROFILES_DIR"
+  cp "$repo_dir/profiles"/*.md "$PROFILES_DIR/"
+  if [[ -f "$repo_dir/profiles/tiers.conf" ]]; then
+    cp "$repo_dir/profiles/tiers.conf" "$PROFILES_DIR/"
+  fi
+  echo "$(green "✓") Profiles synced to $(dim "$PROFILES_DIR")"
+
+  if [[ -d "$repo_dir/agents" ]]; then
+    mkdir -p "$agents_dst"
+    cp "$repo_dir/agents"/*.md "$agents_dst/"
+    echo "$(green "✓") Subagents synced to $(dim "$agents_dst")"
+  fi
+
+  mkdir -p "$commands_dst"
+  cp "$repo_dir/commands"/*.md "$commands_dst/"
+  echo "$(green "✓") Slash commands synced to $(dim "$commands_dst")"
+  echo ""
+  echo "$(dim "Edit profiles in $repo_dir/profiles, then rerun: claude-team sync")"
+  echo ""
+}
+
 # Register bin/team-session-start as a SessionStart hook in ~/.claude/settings.json.
 # hooks/hooks.json covers the plugin install path only, where CLAUDE_PLUGIN_ROOT
 # resolves; install.sh users need the absolute path written into settings instead.
@@ -979,6 +1026,7 @@ cmd_help() {
   echo "  claude-team coordinator on          Enable coordinator (casual — no branch enforcement)"
   echo "  claude-team coordinator prod        Enable coordinator (prod — branch enforcement on)"
   echo "  claude-team coordinator off         Disable coordinator"
+  echo "  claude-team sync                    Regenerate subagents and reinstall profiles, commands, and agents"
   echo "  claude-team install-commands        Install slash commands to ~/.claude/commands/"
   echo "  claude-team install-hook            Register the SessionStart hook in ~/.claude/settings.json"
   echo ""
@@ -1044,6 +1092,7 @@ case "${1:-help}" in
   coordinator)      cmd_coordinator "${2:-}" ;;
   install-commands) cmd_install_commands ;;
   install-hook)     cmd_install_hook ;;
+  sync)             cmd_sync ;;
   launch)           shift; cmd_launch "$@" ;;
   branch)           shift; cmd_branch "$@" ;;
   session)          shift; cmd_session "$@" ;;

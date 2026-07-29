@@ -716,6 +716,9 @@ claude-team coordinator off   # disable
 # Return to default Claude behavior
 claude-team reset
 
+# Propagate profile edits: regenerate subagents, reinstall all three copies
+claude-team sync
+
 # Install slash commands (if you skipped install.sh or need to re-install)
 claude-team install-commands
 
@@ -771,20 +774,37 @@ cp profiles/robin.md profiles/yourname.md
 
 2. Edit it to define the persona, expertise, security focus, and communication style.
 
-3. Install it:
+3. Optionally add a model tier in `profiles/tiers.conf`.
+
+4. Install it everywhere:
 
 ```bash
-bash install.sh   # full reinstall, or:
-cp profiles/yourname.md ~/.claude/team/yourname.md
+claude-team sync
 ```
 
-4. Activate it:
+5. Activate it:
 
 ```bash
 claude-team use yourname
 ```
 
 See `examples/CLAUDE.md.example` for a reference of what an activated profile looks like in context.
+
+### Editing an existing persona
+
+Edit the profile in the clone, then run `claude-team sync`. Do not edit `~/.claude/team/*.md` directly.
+
+Each persona is installed as three self-contained files, and `profiles/` is the only source of truth:
+
+| File | Used by | Kept in sync by |
+|---|---|---|
+| `~/.claude/team/<name>.md` | `claude-team show`, `claude-team use` | copied from `profiles/` |
+| `~/.claude/agents/<name>.md` | delegation ("have robin review this diff") | regenerated from `profiles/` |
+| `~/.claude/commands/<name>.md` | the `/<name>` slash command | copied from `commands/` |
+
+Editing the installed profile updates the first and silently leaves the other two stale, with nothing to warn you. `sync` regenerates the subagent and reinstalls all three.
+
+The slash command is the one piece `sync` cannot generate, since `commands/` is hand-maintained: it is the profile with the Required Interactive Behaviors section excised, wrapped in a switch preamble. For a brand-new persona, copy `commands/robin.md` to `commands/yourname.md` and swap the body in. The test suite fails if a slash command drifts from its profile.
 
 ---
 

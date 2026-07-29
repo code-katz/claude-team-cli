@@ -5,6 +5,42 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-29] claude-team sync: one command for the three-copy persona problem
+
+**Category:** `decision`
+**Tags:** `cli`, `install`, `sync`, `drift`, `customization`, `bugfix`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+Adds `claude-team sync`, which regenerates subagents from profiles and reinstalls all three installed persona copies. `install.sh` now delegates its copying to it, so one code path decides where persona files land. Also fixes a crash shipped in PR #20.
+
+### Detail
+
+**The trap.** A persona is installed as three self-contained files: `~/.claude/team/<name>.md` (read by `show` and `use`), `~/.claude/agents/<name>.md` (the delegation subagent), and `~/.claude/commands/<name>.md` (the `/<name>` slash command). Nothing linked them. Editing the installed profile, which is the obvious move since `claude-team show` reads it, updated exactly one of the three and left the other two stale with no warning and no error. `/akira` and `use akira` would disagree about who Akira is, and the user would sooner blame the model than suspect three divergent files. The README made it worse: "Adding Your Own Team Members" step 3 said to `cp` the profile into `~/.claude/team/`, which produces a persona with no slash command and no subagent.
+
+**Why this was the one worth fixing.** Two other install gaps surfaced in the same sweep. The CLI symlink into the clone breaks loudly if the clone moves, and loud is correct there: the install genuinely is broken and `bash install.sh` fixes it, so silencing it would hide real breakage. `WRITING.md` not being installed is cosmetic. This one fails silently and partially, and it hits persona customization, which is the product's whole point. README line 885 still lists `~/.claude/team/local/` overrides as planned, so there was no supported customization path at all.
+
+**install.sh now delegates.** Its three copy blocks were replaced with one `"$BIN_SRC" sync` call, and the CLI symlink step moved ahead of it so the binary exists when it is invoked. This follows the convention the coordinator path already set: the CLI owns the edit, install.sh calls it, and the suite exercises the same path users do. Without it there would be two copy implementations free to drift, which is the exact bug class this repository keeps hitting.
+
+**A crash from PR #20 was found and fixed.** `cmd_install_hook` called `yellow` in its python3-missing branch, but `bin/claude-team` never defined that helper; only `install.sh` had it. Under `set -euo pipefail` an undefined function exits 127, so `claude-team install-hook` would have crashed instead of printing the manual JSON on any machine without python3. Neither the suite nor shellcheck caught it, because every CI runner has python3 and that branch never executed. Verified fixed by running the command against a restricted PATH.
+
+### Decisions Made
+
+- **`sync` regenerates before copying.** `agents/` is derived from `profiles/`, so copying first would install subagents lagging the profile edit that prompted the sync.
+- **`sync` does not generate slash commands.** `commands/` is hand-maintained by design, being the profile with Required Interactive Behaviors excised and a switch preamble wrapped around it. `sync` copies them; the drift test catches divergence. Documented rather than automated.
+- **The symlink stays.** It buys `git pull` updating the CLI with no reinstall, and its failure mode is loud and self-announcing.
+
+### Related
+
+- PR #20: introduced the `yellow` crash fixed here
+- `README.md` "Editing an existing persona": the three-copy table
+- README Roadmap line 885: `~/.claude/team/local/` overrides, still unbuilt
+
+---
+
 ## [2026-07-29] Plain technical English: ASD-STE100 principles for the coding six, without the dictionary
 
 **Category:** `decision`
