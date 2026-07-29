@@ -231,6 +231,15 @@ title_role() {
   printf '%s\n' "${1#*— }"
 }
 
+# Print a profile without its trailing "## Greeting" section. That section
+# holds the line a persona says at the moment a session switches to it, so it
+# belongs only where a session starts now. The section runs to end of file, so
+# stopping at its heading is the whole excision. A profile without the heading
+# prints unchanged.
+profile_without_greeting() {
+  awk '/^## Greeting[[:space:]]*$/{exit} {print}' "$1"
+}
+
 get_active() {
   [[ -f "$CLAUDE_MD" ]] || { echo ""; return; }
   # Extract the name line from the active block
@@ -343,8 +352,11 @@ cmd_use() {
   local profile
   profile=$(resolve_name "$name")
 
+  # 'use' pins the persona globally, so every future session reads what lands
+  # here. The greeting is dropped: pinned, it makes every new session open with
+  # the same line forever.
   local content
-  content=$(cat "$profile")
+  content=$(profile_without_greeting "$profile")
   block_install "$CLAUDE_MD" "$MARKER_START" "$MARKER_END" "$content"
 
   local display_name

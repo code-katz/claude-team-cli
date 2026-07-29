@@ -143,6 +143,10 @@ run_cmd use robin >/dev/null
 assert_file_has  "use injects CLAUDE-TEAM block"  "$CLAUDE_MD" "CLAUDE-TEAM:START"
 assert_file_has  "use injects Robin profile"       "$CLAUDE_MD" "Robin — QA"
 assert_count     "use creates exactly 1 block"     "$CLAUDE_MD" "CLAUDE-TEAM:START" 1
+# 'use' pins globally, so a greeting here would fire on every future session
+# rather than at the moment of the switch. The body must still arrive whole.
+assert_file_lacks "use excludes the greeting"      "$CLAUDE_MD" "^## Greeting"
+assert_file_has   "use keeps the signature question" "$CLAUDE_MD" "Signature Question"
 echo ""
 
 # use — persona switch
