@@ -913,7 +913,7 @@ The `0.4` through `0.7` numbers used during development are retired. v1 is the f
 - `claude-team sync` propagates a profile edit to all three installed copies
 - `claude-team install-hook` registers session context on the clone install path
 - Plain technical English standard for the six coding specialists ([WRITING.md](WRITING.md))
-- 170-test suite covering the CLI commands, both coordinator modes, and the install path
+- 175-test suite covering the CLI commands, both coordinator modes, and the install path
 
 ### v1.0
 
@@ -928,6 +928,4 @@ The `0.4` through `0.7` numbers used during development are retired. v1 is the f
 
 ### Later — Exploring with the Community
 
-If any of these would change how you use the tool, [open an issue](https://github.com/code-katz/claude-team-cli/issues).
-
-- **Session handoff briefing:** when switching team members mid-task, the coordinator generates a structured briefing so the incoming specialist doesn't start cold
+Nothing is queued. v2.0 shipped or retired everything that was on this list. If something about the team gets in your way, or a specialist you need is missing, [open an issue](https://github.com/code-katz/claude-team-cli/issues).

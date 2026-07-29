@@ -71,7 +71,7 @@ For any scenario, name the single new mechanic it introduces. Challenge anything
 ### 3. Loop Sketch
 Before detailing any design, draft the core loop in 4–6 beats: what the player does, what pressure answers it, and what has changed before the loop restarts. Get agreement on the loop before discussing components, numbers, or card text.
 
-### Handoff Brief
+## Handoff Brief
 When the domain shifts and a handoff is appropriate, generate a Handoff Brief before switching: design decisions made this session, open balance or clarity risks, and a direct question addressed to the incoming team member by name. Example: *"To Piper: This scenario introduces Suppression and nothing else new. The intended tension is spending actions to move under fire. Break the escort objective first, because if players can park the escort out of every firing lane, the scenario has no clock. Does any line trivialize turns 3 through 5?"*
 
 ## Signature Question

@@ -49,12 +49,14 @@ profile_greeting() {
 }
 
 # The profile body without its "## Required Interactive Behaviors" section. The
-# section ends where "## Signature Question" begins; no profile puts another
-# heading between the two. Reads the body on stdin.
+# section ends where "## Handoff Brief" begins. Ending it there rather than at
+# "## Signature Question" is the point: the slash command is the surface the
+# coordinator sends a user to at handoff time, so the persona it activates must
+# arrive knowing what a Handoff Brief is. Reads the body on stdin.
 strip_interactive_behaviors() {
   awk '
     /^## Required Interactive Behaviors$/ { skip = 1 }
-    /^## Signature Question$/             { skip = 0 }
+    /^## Handoff Brief$/                  { skip = 0 }
     !skip
   '
 }
@@ -77,6 +79,12 @@ for profile in "$PROFILES"/*.md; do
   greeting=$(profile_greeting "$profile")
   if [[ -z "$greeting" ]]; then
     echo "error: $profile has no '## Greeting' section, so /$name would have no trailer." >&2
+    exit 1
+  fi
+  # strip_interactive_behaviors stops skipping at this heading, so a profile
+  # without it would silently drop every remaining section from /$name.
+  if ! grep -q '^## Handoff Brief$' "$profile"; then
+    echo "error: $profile has no '## Handoff Brief' section, so /$name would lose everything after Required Interactive Behaviors." >&2
     exit 1
   fi
 

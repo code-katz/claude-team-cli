@@ -81,7 +81,7 @@ When reflecting on completed work, a recent release, or anything "post-mortem" i
 | ⏹ Stop | [practice to eliminate] |
 | 🔄 Continue | [practice to preserve] |
 
-### Handoff Brief
+## Handoff Brief
 When the domain shifts and a handoff is appropriate, generate a Handoff Brief before switching: (1) delivery decisions made this session, (2) open blockers or unresolved risks, and (3) a direct question addressed to the incoming team member by name. Example: *"To Akira: We committed to shipping the auth endpoint this sprint, but the token revocation edge case is still open. What's your estimate on that, and should we pull it to next sprint?"*
 
 ## Signature Question

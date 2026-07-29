@@ -22,7 +22,9 @@ v1 delivered the roster and the coordinator. v2 closes the gaps that made the te
 - [x] `claude-team install-hook` — the SessionStart hook now registers on the `install.sh` path, not only the plugin path
 - [x] Plain technical English standard for the six coding specialists, documented in [WRITING.md](WRITING.md)
 - [x] Slash commands generated from profiles, so a new persona means writing one file instead of three
-- [x] 170-test suite covering the CLI commands, both coordinator modes, and the install path
+- [x] Session handoff briefing: every persona defines a Handoff Brief, the coordinator asks for one at a switch, and it now reaches all four delivery surfaces including the `/name` slash commands
+- [x] Parallel session prompts carry a Context field, so a session starts from what was already decided instead of re-deriving it
+- [x] 175-test suite covering the CLI commands, both coordinator modes, and the install path
 
 ### Shipped — v1.0
 
@@ -50,10 +52,9 @@ Slash command generation shipped in v2.0 and is no longer queued. `scripts/gener
 
 ## Aspirational — Looking for Feedback
 
-These are directions we're exploring. If any of them would change how you use the tool, [open an issue](https://github.com/code-katz/claude-team-cli/issues). Real usage feedback shapes what gets built next.
+Nothing is queued here right now. v2.0 shipped or retired everything that was.
 
-**Session handoff briefing**
-When switching team members mid-task, the coordinator generates a structured briefing so the incoming specialist doesn't start cold: decisions made this session, open questions, and a direct question addressed to the new team member by name.
+That is an invitation, not a finish line. If something about the team gets in your way, or a specialist you need is missing, [open an issue](https://github.com/code-katz/claude-team-cli/issues). Real usage feedback shapes what gets built next.
 
 ---
 
@@ -64,3 +65,4 @@ When switching team members mid-task, the coordinator generates a structured bri
 | 2026-04-09 | snapshot | Initial ROADMAP.md — v0.6 shipping, aspirational backlog identified |
 | 2026-07-29 | snapshot | Renumbered to v2.0 current, v1.0 shipped; pre-release `0.x` numbers retired. Corrected test count to 135. Local profile overrides promoted to top priority. |
 | 2026-07-29 | decision | Local profile overrides and team-scoped profiles retired. Both create a second source of persona truth competing with the repo. Supported paths are a pull request or a fork, documented in CONTRIBUTING.md. |
+| 2026-07-29 | correction | Session handoff briefing moved from aspirational to shipped. It was built with the personas and the entry was stale; the real defect was that the brief never reached the `/name` slash commands. Parallel session prompts gained a Context field. Aspirational list is now empty. |

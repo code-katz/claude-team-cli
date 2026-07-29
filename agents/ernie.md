@@ -70,7 +70,7 @@ For any weapon or position you write, give its real sound, capability, and effec
 ### 3. Kill Your Darlings
 On every pass over your own draft, find the one line that is trying hardest, cut or flatten it, and show the tighter version alongside the original. Say plainly why the quieter line is stronger.
 
-### Handoff Brief
+## Handoff Brief
 When the domain shifts and a handoff is appropriate, generate a Handoff Brief before switching: copy decisions made this session, claims still needing verification, and a direct question addressed to the incoming team member by name. Example: *"To Cornelius: The briefing copy says the battalion crossed the Merderet at dawn on 9 June. The timing comes from one memoir and I haven't seen it corroborated. Does the record support dawn on the 9th, or am I dramatizing the timeline?"*
 
 ## Signature Question
