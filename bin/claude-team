@@ -92,7 +92,12 @@ _lock_owner() { cat "$1/owner" 2>/dev/null || true; }
 _lock_is_stale() {
   local lock_dir="$1" host pid started now
   [[ -d "$lock_dir" ]] || return 1
-  if ! read -r host pid started < "$lock_dir/owner" 2>/dev/null; then
+  # The redirect must precede the command. Bash applies redirections left to
+  # right and aborts on the first failure, so a trailing 2>/dev/null is never
+  # installed when the '<' itself fails. A missing owner file is the normal
+  # transient state described above, so the old form leaked a raw bash error to
+  # the terminal on roughly half of all contended calls.
+  if ! 2>/dev/null read -r host pid started < "$lock_dir/owner"; then
     return 1
   fi
   now=$(date '+%s')
@@ -235,6 +240,35 @@ profile_title() {
 
 title_name() {
   printf '%s\n' "${1%% —*}"
+}
+
+# Drop a trailing "Consultant" or "Manager", which reads as noise in a one-line
+# roster, unless dropping it would leave a single word: "Product Manager" must
+# not become "Product". Mirrors the rule in scripts/generate-agents.sh.
+short_role() {
+  local role="$1"
+  case "$role" in
+    *" Consultant" | *" Manager")
+      case "${role% *}" in *" "*) role="${role% *}" ;; esac
+      ;;
+  esac
+  printf '%s\n' "$role"
+}
+
+# Emit "slug<TAB>Display<TAB>Short role" for every persona, read from the
+# profiles on disk. Every roster the CLI prints derives from this. Four separate
+# hardcoded copies of this list had drifted, leaving 'claude-team help' and the
+# installer missing four to nine of the seventeen personas: a roster a human has
+# to remember to update is a roster that goes stale.
+persona_roster() {
+  local profile name title
+  for profile in "$PROFILES_DIR"/*.md; do
+    [[ -f "$profile" ]] || continue
+    name=$(basename "$profile" .md)
+    case "$name" in coordinator*) continue ;; esac
+    title=$(profile_title "$profile")
+    printf '%s\t%s\t%s\n' "$name" "$(title_name "$title")" "$(short_role "$(title_role "$title")")"
+  done
 }
 
 title_role() {
@@ -522,19 +556,10 @@ Make sure you are running this from the claude-team-cli repo."
   done
   echo ""
   echo "Use them in any Claude Code session:"
-  echo "  $(dim "/robin")   — switch to Robin (Testing)"
-  echo "  $(dim "/akira")   — switch to Akira (Backend)"
-  echo "  $(dim "/sasha")   — switch to Sasha (Frontend)"
-  echo "  $(dim "/toni")    — switch to Toni (Product Marketing)"
-  echo "  $(dim "/river")   — switch to River (Product)"
-  echo "  $(dim "/alex")    — switch to Alex (DevOps)"
-  echo "  $(dim "/morgan")  — switch to Morgan (Security)"
-  echo "  $(dim "/jordan")  — switch to Jordan (Data & ML)"
-  echo "  $(dim "/casey")   — switch to Casey (Data Analyst)"
-  echo "  $(dim "/quinn")   — switch to Quinn (Project Manager)"
-  echo "  $(dim "/sage")    — switch to Sage (Business Advisor)"
-  echo "  $(dim "/kai")     — switch to Kai (UX Design)"
-  echo "  $(dim "/iris")    — switch to Iris (Brand & Illustration)"
+  # Same derivation as cmd_help: one roster, read from the profiles on disk.
+  while IFS=$'\t' read -r slug display role; do
+    printf '  %s — switch to %s (%s)\n' "$(dim "/$slug")" "$display" "$role"
+  done < <(persona_roster)
   echo "  $(dim "/team")    — show current team status"
   echo ""
   echo "$(dim "No new session required — switches take effect immediately.")"
@@ -1305,19 +1330,11 @@ cmd_help() {
   echo "  claude-team branch guard remove    Remove the pre-commit hook"
   echo ""
   echo "$(bold "Examples:")"
-  echo "  claude-team use robin               Activate Robin (Testing)"
-  echo "  claude-team use akira               Activate Akira (Backend)"
-  echo "  claude-team use sasha               Activate Sasha (Frontend)"
-  echo "  claude-team use toni                Activate Toni (Product Marketing)"
-  echo "  claude-team use river               Activate River (Product)"
-  echo "  claude-team use alex                Activate Alex (DevOps)"
-  echo "  claude-team use morgan              Activate Morgan (Security)"
-  echo "  claude-team use jordan              Activate Jordan (Data & ML)"
-  echo "  claude-team use casey               Activate Casey (Data Analyst)"
-  echo "  claude-team use quinn               Activate Quinn (Project Manager)"
-  echo "  claude-team use sage                Activate Sage (Business Advisor)"
-  echo "  claude-team use kai                 Activate Kai (UX Design)"
-  echo "  claude-team use iris                Activate Iris (Brand & Illustration)"
+  # Derived from the profiles on disk, so a new persona appears here the moment
+  # its profile lands. The previous hardcoded list was missing four of them.
+  while IFS=$'\t' read -r slug display role; do
+    printf '  claude-team use %-22s Activate %s (%s)\n' "$slug" "$display" "$role"
+  done < <(persona_roster)
   echo "  claude-team coordinator on          Enable coordinator (casual — commit to main, no branch gate)"
   echo "  claude-team coordinator prod        Enable coordinator (prod — branch required before code)"
   echo "  claude-team reset                   Return to default Claude behavior"

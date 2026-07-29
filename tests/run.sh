@@ -103,6 +103,39 @@ out=$(run_cmd help)
 assert_contains     "shows tool name"            "claude-team"       "$out"
 assert_contains     "lists use command"          "use <name>"        "$out"
 assert_contains     "lists install-commands"     "install-commands"  "$out"
+# Every roster the CLI prints is derived from the profiles on disk. Four
+# separate hardcoded copies had drifted, leaving help and the installer missing
+# four to nine of the seventeen personas: nothing broke, but a new user could
+# not discover team members that exist. A derived list cannot drift, and this
+# asserts the derivation rather than the current text.
+missing=""
+for profile in "$PROFILES_DIR"/*.md; do
+  pname=$(basename "$profile" .md)
+  case "$pname" in coordinator*) continue ;; esac
+  grep -q "claude-team use $pname " <<< "$out" || missing="$missing $pname"
+done
+if [[ -z "$missing" ]]; then ok "help lists every persona"
+else fail "help lists every persona (missing:$missing)"; fi
+out=$(run_cmd install-commands)
+missing=""
+for profile in "$PROFILES_DIR"/*.md; do
+  pname=$(basename "$profile" .md)
+  case "$pname" in coordinator*) continue ;; esac
+  grep -q "/$pname" <<< "$out" || missing="$missing $pname"
+done
+if [[ -z "$missing" ]]; then ok "install-commands lists every persona"
+else fail "install-commands lists every persona (missing:$missing)"; fi
+assert_not_contains "the roster excludes the coordinator profiles" "use coordinator" "$out"
+# The installer prints its own slash-command line; it must derive it too.
+missing=""
+for profile in "$PROFILES_DIR"/*.md; do
+  pname=$(basename "$profile" .md)
+  case "$pname" in coordinator*) continue ;; esac
+  grep -q "coordinator\*" "$REPO_DIR/install.sh" || true
+  grep -q "profiles/\*.md" "$REPO_DIR/install.sh" || missing="derived-loop-absent"
+done
+if [[ -z "$missing" ]]; then ok "installer derives its slash-command list from profiles"
+else fail "installer derives its slash-command list from profiles"; fi
 echo ""
 
 # list
