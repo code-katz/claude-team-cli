@@ -1173,10 +1173,22 @@ else
   fail "the temp file window was observed, so this test is not vacuous (the write finished first: enlarge the fixture)"
 fi
 wait "$int_pid" 2>/dev/null
-# Proves the interrupt landed before the rename. Without it, a signal arriving
-# after tmp_commit would leave no orphan on any build and the check below would
-# pass for the wrong reason.
-assert_file_lacks "the interrupted write did not land" "$INT_MD" "CLAUDE-TEAM:START"
+# Assert what the design actually guarantees, which is that a reader sees the
+# whole old file or the whole new one, never a partial write. Whether the rename
+# beat the signal is timing, not correctness: seeing the temp file appear does
+# not prove the signal arrived before tmp_commit, because the rename can land in
+# the microseconds between the two. An earlier version asserted the write had
+# not landed and failed on macOS for exactly that reason, where process spawn is
+# slower and the window sits differently.
+int_starts=$(grep -cF "CLAUDE-TEAM:START" "$INT_MD" 2>/dev/null || true)
+int_ends=$(grep -cF "CLAUDE-TEAM:END" "$INT_MD" 2>/dev/null || true)
+if [[ "$int_starts" == "$int_ends" && ( "$int_starts" == "0" || "$int_starts" == "1" ) ]]; then
+  ok "an interrupted write leaves the file coherent, not half-written"
+else
+  fail "an interrupted write leaves the file coherent, not half-written ($int_starts start, $int_ends end)"
+fi
+# The user's own content must survive either outcome.
+assert_count "an interrupted write preserves every user line" "$INT_MD" "^$int_line$" 2000
 int_orphans=$(find "$INT_HOME/.claude" -maxdepth 1 -name '.claude-team.*' 2>/dev/null | wc -l | tr -d ' ')
 if [[ "$int_orphans" == "0" ]]; then ok "SIGINT mid-write leaves no temp file beside the target"
 else fail "SIGINT mid-write leaves no temp file beside the target (found $int_orphans)"; fi
