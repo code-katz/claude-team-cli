@@ -62,10 +62,15 @@ capitalize() { printf '%s\n' "${1^}"; }
 #   - the holder records host, PID, and acquisition time in <lock>/owner;
 #   - the EXIT, INT, and TERM traps release the lock on every exit except
 #     SIGKILL and power loss;
-#   - a contender breaks a lock whose holder is a dead process on this host,
-#     or whose age exceeds LOCK_STALE_SECONDS. The age rule also covers a lock
-#     left by a reboot, where the recorded PID may since have been reassigned
-#     to a live process.
+#   - a contender breaks a lock only when the holder is provably gone: a dead
+#     PID on this host, or, where liveness cannot be established at all, an
+#     acquisition older than LOCK_STALE_SECONDS. See _lock_is_stale.
+#   - breaking has exactly one winner, and the lock directory is removed only by
+#     the process that owns it. A stale lock is taken over IN PLACE, by renaming
+#     its owner record aside, which exactly one contender can do. See
+#     _lock_takeover, which also records why removing the directory instead
+#     cannot be made correct. The one exception is a lock with no owner record at
+#     all, which has nothing to take over; see _lock_break.
 #
 # The critical sections are a few awk passes over a small file, so a wait of
 # seconds already means a holder is stuck rather than queued.
@@ -74,13 +79,54 @@ LOCK_STALE_SECONDS=120
 LOCK_POLL_SECONDS=0.05
 LOCK_HOST="${HOSTNAME:-$(uname -n 2>/dev/null || echo unknown)}"
 
-_LOCK_DIR=""   # non-empty while this process holds a lock
-_TMP_FILE=""   # non-empty while a temp file waits for its rename
+_LOCK_DIR=""          # non-empty while this process holds a lock
+_LOCK_DEAD=""         # non-empty while a renamed-aside lock waits for removal
+_LOCK_CLAIMED=""      # non-empty while a claimed owner record waits to be replaced
+_LOCK_CLAIMED_DEST="" # where _LOCK_CLAIMED must be put back on an early exit
+_TMP_FILE=""          # non-empty while a temp file waits for its rename
 
-_lock_owner() { cat "$1/owner" 2>/dev/null || true; }
+_LOCK_OWNER_LINE=""  # owner record from the last _lock_read_owner call
 
-# True only when the lock holder is provably gone: a dead PID on this host, or
-# an acquisition older than LOCK_STALE_SECONDS.
+# Read an owner record from $1, which is the path of the record FILE, into
+# _LOCK_OWNER_LINE. Takes the file and not its directory, because a claimed
+# record is renamed to a sibling name and has to be readable too.
+#
+# Fork count is load-bearing here, not a micro-optimisation. Every fork between
+# the staleness verdict and the claim widens the window in which other contenders
+# can act on the lock, and a verdict applied after that window is applied to the
+# wrong object. 'owner=$(cat ...)' costs two forks, the subshell and the exec; a
+# redirect into 'read' costs none.
+_lock_read_owner() {
+  local line=""
+  # A missing file leaves $line empty and returns non-zero, and so does a final
+  # line with no newline, which has still been assigned. Keep what was assigned.
+  2>/dev/null read -r line < "$1" || true
+  _LOCK_OWNER_LINE="$line"
+  return 0
+}
+
+# True only when the lock holder is provably gone.
+#
+# Liveness is checked first and it is decisive: on this host, a live PID is
+# never stale, whatever its age. The age test used to run first and
+# independently, so a holder that was merely paused lost a lock it still held,
+# and both writers then reported success on a write only one of them kept.
+# Three ordinary events pause a holder past 120 seconds: SIGSTOP (job control),
+# a laptop suspend mid-command, and a clock that steps forward (NTP correction,
+# a VM resuming from a snapshot).
+#
+# The age rule is the fallback for the case where liveness cannot be
+# established at all: a lock recorded by a different host, which happens when
+# $HOME is shared over NFS, or a PID field that is not a number.
+#
+# The tradeoff, accepted deliberately. A reboot can leave a lock whose recorded
+# PID has since been reused by an unrelated live process. Liveness-first then
+# judges that lock live, so instead of being broken at 120 seconds it wedges
+# until the 15-second acquire timeout, and the timeout message already prints
+# the exact 'rm -rf' that clears it. That is loud, bounded, and recoverable by
+# the user. The alternative, which is what the age-first order did, is to
+# silently discard a completed write. A wedge the user can see and fix beats a
+# lost write nobody ever learns about.
 #
 # Two states deliberately count as live. An absent lock directory is not
 # stale: the next mkdir wins it, and breaking it would delete a directory that
@@ -100,11 +146,17 @@ _lock_is_stale() {
   if ! 2>/dev/null read -r host pid started < "$lock_dir/owner"; then
     return 1
   fi
-  now=$(date '+%s')
-  if [[ "$started" =~ ^[0-9]+$ ]] && (( now - started > LOCK_STALE_SECONDS )); then
+  # An 'if', not 'kill -0 ... && return 1': an && list here returns the failed
+  # left-hand status, which is the shape that has already killed two functions
+  # in this file when it landed last in a body.
+  if [[ "$host" == "$LOCK_HOST" && "$pid" =~ ^[0-9]+$ ]]; then
+    if kill -0 "$pid" 2>/dev/null; then
+      return 1
+    fi
     return 0
   fi
-  if [[ "$host" == "$LOCK_HOST" && "$pid" =~ ^[0-9]+$ ]] && ! kill -0 "$pid" 2>/dev/null; then
+  now=$(date '+%s')
+  if [[ "$started" =~ ^[0-9]+$ ]] && (( now - started > LOCK_STALE_SECONDS )); then
     return 0
   fi
   return 1
@@ -121,14 +173,133 @@ _lock_take() {
   return 0
 }
 
+# Remove directories a killed breaker left beside the lock. Only a SIGKILL
+# between _lock_break's rename and its removal can leave one, because the traps
+# cover every other exit, and nothing reads these paths. An 'if' rather than
+# '&& rm', so a false test cannot become the function's exit status.
+_lock_sweep_dead() {
+  local lock_dir="$1" leftover
+  for leftover in "$lock_dir".dead.*; do
+    if [[ -d "$leftover" ]]; then rm -rf "$leftover"; fi
+  done
+  return 0
+}
+
+# Take a stale lock over IN PLACE, and let exactly one contender do it.
+# Returns 0 only if this process now holds the lock. $2 is the owner record the
+# caller judged stale, and it is what makes this safe.
+#
+# The lock directory is never removed here, and that is the whole design. A
+# contender claims the lock by renaming its OWNER RECORD aside, which succeeds
+# for exactly one of them because the source file stops existing and every later
+# rename of it gets ENOENT. The winner then writes its own record in place.
+#
+# Removing the directory instead cannot be made correct, and it took two
+# measured attempts to establish that. 'rm -rf "$lock_dir"' lost updates in 6 of
+# 30 runs at 12 concurrent writers. Claiming the removal with
+# 'mv "$lock_dir" "$lock_dir".dead.$$' still lost them in 5 of 30, and an
+# instrumented run showed why: contender A renamed the stale lock aside, B took
+# the path A had just freed, and C, acting on a verdict computed before any of
+# that, renamed away B's LIVE lock. All three reported success. Verifying after
+# the claim and rebuilding the victim's lock cut it to 1 in 30, but could not
+# reach zero, because every one of those designs frees the lock path for a moment
+# and a mkdir can always land in that moment.
+#
+# Taking over in place has no such moment. While the record is renamed aside the
+# directory still exists, so no mkdir can succeed, and a contender that finds no
+# readable owner record already treats the lock as live and waits. Two further
+# properties follow, and both matter:
+#
+#   - the verification is free of races. Once the record has been renamed aside,
+#     this process holds the only path to it, so it can be read and compared at
+#     leisure. A record that is not the one we judged means our verdict expired,
+#     and we hand it straight back.
+#   - handing it back cannot fail. The only writers of <lock>/owner are a holder
+#     that has just created the directory, which cannot happen while it exists,
+#     and a takeover winner, which cannot happen while we hold the record. So
+#     nothing can occupy the path we are restoring.
+_lock_takeover() {
+  local lock_dir="$1" want="$2" got
+  local claimed="$lock_dir/owner.dead.$$"
+  mv "$lock_dir/owner" "$claimed" 2>/dev/null || return 1
+  # Registered for the traps: dying here would otherwise leave the lock with no
+  # owner record at all, which reads as live to every contender and so wedges
+  # the file until the timeout tells a human to remove it.
+  _LOCK_CLAIMED="$claimed"
+  _LOCK_CLAIMED_DEST="$lock_dir/owner"
+  _lock_read_owner "$claimed"
+  got="$_LOCK_OWNER_LINE"
+  if [[ "$got" != "$want" ]]; then
+    mv "$claimed" "$lock_dir/owner" 2>/dev/null || true
+    _LOCK_CLAIMED=""
+    _LOCK_CLAIMED_DEST=""
+    return 1
+  fi
+  # Ours. _LOCK_DIR is set before the record is written, so the traps release the
+  # lock if this process dies in between.
+  _LOCK_DIR="$lock_dir"
+  printf '%s %s %s\n' "$LOCK_HOST" "$$" "$(date '+%s')" > "$lock_dir/owner" \
+    || die "Cannot write the lock owner record: $lock_dir/owner"
+  rm -f "$claimed"
+  _LOCK_CLAIMED=""
+  _LOCK_CLAIMED_DEST=""
+  _lock_sweep_dead "$lock_dir"
+  return 0
+}
+
+# Remove an OWNERLESS lock directory, and let exactly one contender do it.
+# Returns 0 only if this process removed it.
+#
+# This is the deadline path only: a lock with no owner record at all belongs to a
+# holder that died between its mkdir and its record write, and there is no record
+# to take over, so the directory itself has to go. _lock_takeover handles every
+# lock that has a record.
+#
+# The removal is claimed by the rename for the same reason as above: 'mv' onto a
+# name that does not exist succeeds for exactly one contender. $2 is the record
+# expected inside, which is the empty string here; a directory that has acquired
+# a real owner record since the caller tested it fails that check and is rebuilt
+# for its owner rather than deleted.
+_lock_break() {
+  # Two 'local's, not one: within a single 'local', $lock_dir is not yet in
+  # scope, so 'dead' would be built from whatever the caller's scope held.
+  local lock_dir="$1" want="$2" got
+  local dead="$lock_dir.dead.$$"
+  mv "$lock_dir" "$dead" 2>/dev/null || return 1
+  # Registered between the rename and the removal so the traps clear it: a
+  # renamed-aside directory must not outlive the process that claimed it.
+  _LOCK_DEAD="$dead"
+  _lock_read_owner "$dead/owner"
+  got="$_LOCK_OWNER_LINE"
+  if [[ "$got" != "$want" ]]; then
+    # Rebuilt with mkdir rather than renamed back: 'mv "$dead" "$lock_dir"' onto
+    # a path a third contender has already taken moves the directory INSIDE it,
+    # leaving debris in a live lock. mkdir simply fails when the path is taken,
+    # and a lock is addressed by path and not by inode, so a rebuilt directory
+    # holding the same record is the same lock to every reader.
+    if mkdir "$lock_dir" 2>/dev/null; then
+      printf '%s\n' "$got" > "$lock_dir/owner"
+    fi
+    rm -rf "$dead"
+    _LOCK_DEAD=""
+    return 1
+  fi
+  rm -rf "$dead"
+  _LOCK_DEAD=""
+  _lock_sweep_dead "$lock_dir"
+  return 0
+}
+
 # Take the lock for a shared file. Waits up to LOCK_WAIT_SECONDS, then fails
 # with the holder's identity and the command that clears the lock by hand.
 #
-# Before it breaks a stale lock, the contender confirms the verdict twice,
-# LOCK_POLL_SECONDS apart, with an unchanged owner record, so a lock that
-# another contender took in between survives. The residual window is the few
-# microseconds between the second check and the removal, and it opens only
-# once a holder has already died.
+# Before it claims a stale lock, the contender confirms the verdict twice,
+# LOCK_POLL_SECONDS apart, with an unchanged owner record, so a lock that another
+# contender took in between survives. That narrows the race; it does not close
+# it, because the second check and the claim are still two separate steps.
+# _lock_takeover is what closes it, by verifying after the claim what it actually
+# took, and the confirm-twice pass is kept because it keeps almost every
+# contender from reaching that point at all.
 lock_acquire() {
   local target="$1" lock_dir="$1.lock" deadline snapshot broke_once=false
   deadline=$(( SECONDS + LOCK_WAIT_SECONDS ))
@@ -138,25 +309,48 @@ lock_acquire() {
       return 0
     fi
     if _lock_is_stale "$lock_dir"; then
-      snapshot=$(_lock_owner "$lock_dir")
+      _lock_read_owner "$lock_dir/owner"
+      snapshot="$_LOCK_OWNER_LINE"
       sleep "$LOCK_POLL_SECONDS"
-      if _lock_is_stale "$lock_dir" && [[ "$(_lock_owner "$lock_dir")" == "$snapshot" ]]; then
-        rm -rf "$lock_dir"
+      # A successful takeover means this process now holds the lock, so return
+      # rather than looping back to mkdir a path that is deliberately still
+      # occupied. Losing the claim is the normal outcome for every contender but
+      # one, and is not an error.
+      if _lock_is_stale "$lock_dir"; then
+        _lock_read_owner "$lock_dir/owner"
+        if [[ "$_LOCK_OWNER_LINE" == "$snapshot" ]] && _lock_takeover "$lock_dir" "$snapshot"; then
+          return 0
+        fi
       fi
-      continue
+      # Falls through to the deadline check rather than looping straight back.
+      # A 'continue' here skipped that check entirely, so a lock that looked
+      # stale but could never be claimed spun forever with no message and no
+      # timeout. Timing out and naming the holder is the recoverable failure.
     fi
     if (( SECONDS >= deadline )); then
       # An owner record still missing after the full wait belongs to a holder
       # that died between its mkdir and its record write: no live holder stays
       # in that state for seconds. Break it once, then wait again.
+      #
+      # This path has no owner record to confirm against, so the single-winner
+      # rename is the only thing standing between two contenders that reach
+      # their deadlines together and a double removal. The budget is spent only
+      # on a claim that succeeded: a contender that loses the race has removed
+      # nothing, so it keeps its one break for the next deadline. It cannot
+      # loop, because the winner's own owner record makes '! -s owner' false.
+      # The expected record is the empty string, which is what makes this path
+      # safe too: a lock that has acquired a real owner record since the test
+      # above fails the verification inside _lock_break and is handed back.
       if [[ "$broke_once" == false && -d "$lock_dir" && ! -s "$lock_dir/owner" ]]; then
-        broke_once=true
-        rm -rf "$lock_dir"
+        if _lock_break "$lock_dir" ""; then
+          broke_once=true
+        fi
         deadline=$(( SECONDS + LOCK_WAIT_SECONDS ))
         continue
       fi
+      _lock_read_owner "$lock_dir/owner"
       die "Timed out after ${LOCK_WAIT_SECONDS}s waiting for the lock on $target.
-Holder (host pid epoch): $(_lock_owner "$lock_dir")
+Holder (host pid epoch): $_LOCK_OWNER_LINE
 If no other claude-team command is running, remove the lock:
   rm -rf $lock_dir"
     fi
@@ -171,7 +365,13 @@ lock_release() {
   [[ -n "$_LOCK_DIR" ]] || return 0
   local dir="$_LOCK_DIR" owner_pid
   _LOCK_DIR=""
-  owner_pid=$(awk '{print $2; exit}' "$dir/owner" 2>/dev/null || true)
+  # Fork-free, like every other read of this record: 'awk' in a command
+  # substitution costs two forks between the read and the removal below, and that
+  # gap is the window in which the directory could stop being ours. The record is
+  # "host pid epoch", written by this file, so the middle field is the PID.
+  _lock_read_owner "$dir/owner"
+  owner_pid="${_LOCK_OWNER_LINE#* }"
+  owner_pid="${owner_pid%% *}"
   if [[ "$owner_pid" == "$$" ]]; then
     rm -rf "$dir"
   fi
@@ -181,7 +381,20 @@ lock_release() {
 # Runs on a normal exit, on die, on a set -e failure, and on Ctrl-C. Nothing
 # runs on SIGKILL or power loss; lock_acquire's staleness rule covers those.
 _cleanup() {
+  # lock_release first. If this process had already taken the lock over, that
+  # removes the whole directory and the claimed record goes with it, and the
+  # restore below then fails harmlessly. Restoring first would instead leave a
+  # directory whose record names someone else, which lock_release must not touch.
   lock_release
+  if [[ -n "$_LOCK_CLAIMED" ]]; then
+    mv "$_LOCK_CLAIMED" "$_LOCK_CLAIMED_DEST" 2>/dev/null || true
+    _LOCK_CLAIMED=""
+    _LOCK_CLAIMED_DEST=""
+  fi
+  if [[ -n "$_LOCK_DEAD" ]]; then
+    rm -rf "$_LOCK_DEAD"
+    _LOCK_DEAD=""
+  fi
   if [[ -n "$_TMP_FILE" ]]; then
     rm -f "$_TMP_FILE"
     _TMP_FILE=""
@@ -192,21 +405,29 @@ trap _cleanup EXIT
 trap '_cleanup; exit 130' INT
 trap '_cleanup; exit 143' TERM
 
-# Create a temp file in the target's own directory and register it for
-# cleanup. mktemp otherwise writes to TMPDIR, which is often tmpfs and so a
-# different filesystem from $HOME. mv across filesystems degrades to copy plus
-# unlink, which is not atomic: a reader can see a partial file, and an
-# interrupted copy leaves one behind.
+# Create a temp file in the target's own directory and register it in
+# _TMP_FILE for the cleanup traps. mktemp otherwise writes to TMPDIR, which is
+# often tmpfs and so a different filesystem from $HOME. mv across filesystems
+# degrades to copy plus unlink, which is not atomic: a reader can see a partial
+# file, and an interrupted copy leaves one behind.
+#
+# The path is returned in _TMP_FILE and NOT printed. Every caller used to read
+# it as tmp=$(tmp_beside ...), and command substitution runs the function in a
+# subshell, so the assignment landed in a child that then exited: the parent's
+# _TMP_FILE stayed empty and _cleanup had nothing to remove. The registration
+# this comment promised never happened, and a SIGINT during a rewrite left a
+# full-size orphan beside CLAUDE.md. Callers must read _TMP_FILE directly.
 tmp_beside() {
   local target="$1" dir
   dir=$(dirname "$target")
   mkdir -p "$dir"
   _TMP_FILE=$(mktemp "$dir/.claude-team.XXXXXX")
-  printf '%s\n' "$_TMP_FILE"
 }
 
 # Put a temp file from tmp_beside in place. Source and target share a
 # filesystem, so this is a rename: readers see the old file or the new one.
+# The registration is cleared only after the rename has succeeded, so a failing
+# mv leaves the temp file registered and the traps remove it.
 tmp_commit() {
   mv "$1" "$2"
   _TMP_FILE=""
@@ -234,8 +455,24 @@ resolve_name() {
 
 # Title parsing. Profile titles use the form "# Name — Role"; both parts
 # split at the FIRST em dash so a role may itself contain one.
+#
+# Prints nothing when the file has no H1, instead of failing. The old form was
+# 'grep -m1 | sed', and under 'set -euo pipefail' the grep's non-zero exit on no
+# match killed the whole command: one stray '.md' in PROFILES_DIR, a notes file
+# or an editor backup, made 'list' exit 1 having printed zero personas with
+# empty stderr, and made 'help' exit 0 with a silently empty roster, because
+# persona_roster runs inside process substitution where the failure is
+# invisible. Callers must treat an empty title as "not a persona profile".
 profile_title() {
-  grep -m1 '^# ' "$1" | sed 's/^# //'
+  local line
+  line=$(grep -m1 '^# ' "$1" 2>/dev/null) || return 0
+  printf '%s\n' "${line#\# }"
+}
+
+# Name the file that was skipped. The failure this replaces was silent, and the
+# user cannot act on a roster that is quietly short unless the cause is named.
+warn_not_a_profile() {
+  echo "$(yellow "!") Skipping $1: no '# Name — Role' heading, so it is not a persona profile." >&2
 }
 
 title_name() {
@@ -267,6 +504,10 @@ persona_roster() {
     name=$(basename "$profile" .md)
     case "$name" in coordinator*) continue ;; esac
     title=$(profile_title "$profile")
+    if [[ -z "$title" ]]; then
+      warn_not_a_profile "$profile"
+      continue
+    fi
     printf '%s\t%s\t%s\n' "$name" "$(title_name "$title")" "$(short_role "$(title_role "$title")")"
   done
 }
@@ -327,7 +568,8 @@ block_install() {
   touch "$file"
   block_assert_sane "$file" "$start" "$end" "block"
   local tmp
-  tmp=$(tmp_beside "$file")
+  tmp_beside "$file"
+  tmp="$_TMP_FILE"
   if grep -qF "$start" "$file"; then
     awk -v m="$start" 'index($0, m){exit} {print}' "$file" > "$tmp"
     printf '%s\n%s\n%s\n' "$start" "$content" "$end" >> "$tmp"
@@ -350,7 +592,8 @@ block_remove() {
   lock_acquire "$file"
   block_assert_sane "$file" "$start" "$end" "block"
   local tmp
-  tmp=$(tmp_beside "$file")
+  tmp_beside "$file"
+  tmp="$_TMP_FILE"
   awk -v s="$start" -v e="$end" '
     index($0, s){skip=1}
     skip && index($0, e){skip=0; next}
@@ -380,9 +623,15 @@ cmd_list() {
     local name
     name=$(basename "$profile" .md)
     [[ "$name" == coordinator* ]] && continue  # coordinator profiles are not team members
-    # Extract the title line (first # heading) and the role after the dash
+    # Extract the title line (first # heading) and the role after the dash.
+    # A file with no H1 is not a persona profile: name it and move on, rather
+    # than aborting the whole listing on it.
     local title role
     title=$(profile_title "$profile")
+    if [[ -z "$title" ]]; then
+      warn_not_a_profile "$profile"
+      continue
+    fi
     role=$(title_role "$title")
 
     local name_cap
@@ -430,6 +679,10 @@ cmd_use() {
 
   local display_name
   display_name=$(title_name "$(profile_title "$profile")")
+  # A profile with no '# Name — Role' heading yields an empty title. The block
+  # was still installed, so name what was activated rather than printing a
+  # checkmark with a blank name.
+  [[ -n "$display_name" ]] || display_name=$(capitalize "$name")
 
   echo ""
   echo "$(green "✓") $(bold "$display_name") is now active."
@@ -720,7 +973,8 @@ cmd_branch_close() {
   [[ -n "$active" ]] || die "No active branch found for '$project'. Nothing to close."
 
   local tmp
-  tmp=$(tmp_beside "$BRANCHES_INDEX")
+  tmp_beside "$BRANCHES_INDEX"
+  tmp="$_TMP_FILE"
   awk -F'|' -v proj="$project" -v ns="$new_status" '
     {
       p = $3; st = $6
@@ -806,7 +1060,8 @@ cmd_branch_guard() {
           || die "A pre-commit hook already exists at $hook_file (not installed by claude-team). Remove it manually first."
       fi
       local tmp_hook
-      tmp_hook=$(tmp_beside "$hook_file")
+      tmp_beside "$hook_file"
+      tmp_hook="$_TMP_FILE"
       cat > "$tmp_hook" << 'HOOK'
 #!/usr/bin/env bash
 # Installed by claude-team branch guard
@@ -1134,7 +1389,8 @@ Run this from inside a session worktree, or use 'claude-team branch done' for no
   # row another session appends in between is not discarded.
   lock_acquire "$BRANCHES_INDEX"
   local tmp
-  tmp=$(tmp_beside "$BRANCHES_INDEX")
+  tmp_beside "$BRANCHES_INDEX"
+  tmp="$_TMP_FILE"
   awk -F'|' -v proj="$project" -v br="$branch" '
     {
       p = $3; b = $4; st = $6
@@ -1236,6 +1492,30 @@ cmd_session() {
   esac
 }
 
+# Stop a sync that copied only part of a persona, and say what state that left.
+#
+# The three surfaces are one unit: a persona is a profile, a slash command, and
+# a subagent, and the whole point of this command is to move them together. Three
+# sequential 'cp' batches used to run unchecked, so a failure between batches
+# left the profiles new while agents/ and commands/ still held the old version,
+# at exit 0 and with a green checkmark on the batch that did land. That is the
+# exact split the command exists to prevent, and it is the one state nothing
+# else warns about.
+#
+# Nothing is rolled back. A partial sync is repaired by finishing it, not by
+# reverting to a different partial state, and a rollback that fails part-way
+# leaves a third state to reason about.
+sync_die() {
+  die "$1
+The sync stopped part-way, so these three surfaces may now hold different versions:
+  profiles       $PROFILES_DIR
+  subagents      $HOME/.claude/agents
+  slash commands $HOME/.claude/commands
+A persona is all three together, so treat this as one broken install, not two
+good surfaces and one stale one. Fix the error above, then rerun
+'claude-team sync': it recopies all three and brings them back level."
+}
+
 # Regenerate agents from profiles, then copy all three installed surfaces from
 # the clone into ~/.claude. A persona exists as three self-contained files
 # (profile, slash command, subagent), so editing one installed copy leaves the
@@ -1262,20 +1542,24 @@ Make sure you are running this from the claude-team-cli repo."
   fi
 
   mkdir -p "$PROFILES_DIR"
-  cp "$repo_dir/profiles"/*.md "$PROFILES_DIR/"
+  cp "$repo_dir/profiles"/*.md "$PROFILES_DIR/" \
+    || sync_die "Failed to copy profiles into $PROFILES_DIR."
   if [[ -f "$repo_dir/profiles/tiers.conf" ]]; then
-    cp "$repo_dir/profiles/tiers.conf" "$PROFILES_DIR/"
+    cp "$repo_dir/profiles/tiers.conf" "$PROFILES_DIR/" \
+      || sync_die "Failed to copy tiers.conf into $PROFILES_DIR."
   fi
   echo "$(green "✓") Profiles synced to $(dim "$PROFILES_DIR")"
 
   if [[ -d "$repo_dir/agents" ]]; then
     mkdir -p "$agents_dst"
-    cp "$repo_dir/agents"/*.md "$agents_dst/"
+    cp "$repo_dir/agents"/*.md "$agents_dst/" \
+      || sync_die "Failed to copy subagents into $agents_dst."
     echo "$(green "✓") Subagents synced to $(dim "$agents_dst")"
   fi
 
   mkdir -p "$commands_dst"
-  cp "$repo_dir/commands"/*.md "$commands_dst/"
+  cp "$repo_dir/commands"/*.md "$commands_dst/" \
+    || sync_die "Failed to copy slash commands into $commands_dst."
   echo "$(green "✓") Slash commands synced to $(dim "$commands_dst")"
   say_session_scope
   echo ""

@@ -19,7 +19,9 @@ These people don't need to be sold on Claude. They need to be sold on **the diff
 
 claude-team-cli is not a prompt library. It's not a collection of system prompts you paste into a chat window.
 
-It's a named, opinionated specialist who shows up with domain expertise, asks the questions a senior practitioner would ask, and pushes back when something's off. Ten of them, covering the full product development lifecycle from discovery to launch.
+It's a named, opinionated specialist who shows up with domain expertise, asks the questions a senior practitioner would ask, and pushes back when something's off. Seventeen of them. Thirteen cover the full product development lifecycle from discovery to launch. The other four are a tabletop-game studio, and they exist to answer the one objection this category always draws.
+
+**The objection, and the answer.** "If it just injects a persona, why not wire up the two or three specialists I care about myself, in an afternoon?" You could. The mechanism was never the moat. Copying a profile is easy; curating specialists who hold a lane and hand off to each other cleanly is the work, and that is what a session actually runs on. The proof is the game studio: Reiner (design), Cornelius (history), Ernie (narrative), and Piper (playtesting) form an interlocking four-person team in a domain the tool was never built for, assembled from the same profile structure as the software specialists. Anyone can paste three prompts; a coherent studio that holds its lanes and hands off by name is a different claim, and it is the one worth paying attention to.
 
 **One-line positioning:** *Your AI development team. Seventeen specialists, one CLI, zero meetings.*
 
@@ -34,6 +36,7 @@ Generic Claude gives you a checklist. A team member reframes the problem.
 1. **You're not getting Claude's best work.** Without a persona, Claude defaults to generic, safe, surface-level responses. With a specialist active, it thinks the way that domain actually thinks.
 2. **It's not a gimmick — it's a workflow.** The coordinator suggests who should lead each task. Slash commands let you switch mid-session. The devlog and roadmap skills persist context across sessions.
 3. **Ten minutes to install. Immediate difference.** `git clone`, `bash install.sh`, done. No API keys, no configuration, no dependencies beyond Bash and Claude Code.
+4. **The team is the moat, not the mechanism.** Injecting a persona is easy to copy; a curated set of specialists who hold their lanes and hand off cleanly is not. The four-person tabletop-game studio (Reiner, Cornelius, Ernie, Piper) is the proof: the same structure produces a working team even in a domain the tool was never built for.
 
 ---
 
@@ -58,6 +61,7 @@ The blog series follows a single product (ACME Personal Jet Packs) through its e
 | 10 | "Who owns this, when is it due, and what's blocking it?" (Quinn) | Blog (Medium) | Written |
 | 11 | "The tools that make the team remember" (Devlog + Roadmap) | Blog (Medium) | Written |
 | 12 | "AI Writes Code Fast. Lint Keeps It Honest." | Blog (Medium) | **Published** |
+| E | "I pointed a dev-team tool at a WW2 board game" (game studio / extensibility) | Blog + LinkedIn | Planned |
 | L1 | Post 0 LinkedIn teaser (Robin before/after) | LinkedIn | Written (Section 6) |
 | L2 | Slash commands overview | LinkedIn | Written (Section 7) |
 
@@ -68,6 +72,10 @@ Post 12 breaks from the ACME series format. It's a standalone thought piece targ
 **Audience expansion:** This post intentionally targets Engineering VPs and technical leadership by framing lint as a scaling and risk problem, not a developer convenience. The "velocity trap" and "math that should worry engineering leaders" sections are written for someone managing a team whose PR volume just tripled.
 
 **Publishing:** Medium + LinkedIn. Same golden rule (no link in LinkedIn body). LinkedIn teaser leads with the tension: AI writes fast, review doesn't scale.
+
+#### The Extensibility Angle (separate thread)
+
+The four-person tabletop-game studio (Reiner, Cornelius, Ernie, Piper) does not belong in the ACME jet-pack series: it is not part of that product's lifecycle, and forcing it in would blur the narrative. It earns its own standalone piece, aimed squarely at the "why not just build this myself" skeptic. Working title: *"I pointed a dev-team tool at a WW2 board game. It built a studio."* The argument is that the same profile structure produced a coherent, lane-disciplined team in a domain the tool was never designed for, which is the strongest answer we have to "why not wire up three personas yourself." Same before/after proof structure; the "after" is the studio holding its lanes and handing off by name. One post, not a series.
 
 ### Post Structure — Persona Spotlights (Posts 1-10)
 
@@ -226,11 +234,11 @@ So I built a team of them.
 
 #### What claude-team-cli actually does
 
-It gives you 10 named specialist personas for Claude Code. Each one is a formal expert consultant with deep domain knowledge, a distinct way of thinking, and real opinions about how work should be done.
+It gives you seventeen named specialist personas for Claude Code. Each one is a formal expert consultant with deep domain knowledge, a distinct way of thinking, and real opinions about how work should be done.
 
 You pick who's on the task. Claude shows up as that person.
 
-Need to define requirements? Call River. Design an API? Akira. Build a component that needs to be accessible and secure? Sasha. Data pipelines? Jordan. Dashboards and KPIs? Casey. Security review? Morgan. Deployment infrastructure? Alex. Test strategy? Robin. Launch positioning? Toni. Sprint planning? Quinn.
+Need to define requirements? Call River. Design an API? Akira. Build a component that needs to be accessible and secure? Sasha. Data pipelines? Jordan. Dashboards and KPIs? Casey. Security review? Morgan. Deployment infrastructure? Alex. Test strategy? Robin. Launch positioning? Toni. Sprint planning? Quinn. Company formation and finances? Sage. A mockup before code? Kai. A logo or icon set? Iris. And when the work isn't software at all, there's a four-person studio for tabletop games: Reiner, Cornelius, Ernie, and Piper.
 
 You can switch mid-session with a slash command. The coordinator — an optional behavior layer — suggests who should lead each task and flags when the work drifts into a different domain.
 
@@ -250,6 +258,17 @@ You can switch mid-session with a slash command. The coordinator — an optional
 | **Robin** | QA & Testing | *"What's the failure mode we haven't considered yet — and could an attacker exploit it?"* |
 | **Toni** | Product Marketing | *"Who specifically benefits from this — and what would make them choose us over doing nothing?"* |
 | **Quinn** | Project Manager | *"Who owns this, when is it due, and what's blocking it?"* |
+
+And when the project isn't software at all, the same structure holds. Here's the four-person studio for tabletop games:
+
+| Name | Role | They'll ask you... |
+|---|---|---|
+| **Reiner** | Tabletop Game Designer | *"What decision is the player actually making here, and is it interesting?"* |
+| **Cornelius** | Military Historian | *"Is this what actually happened, and why did it matter to the outcome?"* |
+| **Ernie** | WW2 Narrative Author | *"Is this true, and does it make the reader feel why it mattered?"* |
+| **Piper** | Tabletop Playtester | *"How do I break this, and is it still fun when I can't?"* |
+
+They were built from the same profile structure as the specialists above, and they hold their lanes the same way: Reiner designs, Cornelius checks the history, Ernie writes the words, Piper tries to break it. That is the real claim. Not "you can inject a persona" (you always could), but "the same structure produces a working team even in a domain the tool was never built for."
 
 These aren't decorative. Each persona comes with enterprise-grade security instincts — every team member flags secrets in code, PII in logs, and missing access controls as a matter of course.
 
@@ -361,7 +380,7 @@ Robin: Before I sketch the strategy, I need to
 That's not a checklist. That's a senior QA engineer
 reframing the problem before touching a test file.
 
-Robin is one of ten. Two-minute install. Open source.
+Robin is one of seventeen. Two-minute install. Open source.
 
 What domain do you wish you had a specialist for?
 
@@ -426,4 +445,4 @@ github.com/code-katz/claude-publish-agent
 
 ---
 
-*Document maintained by Toni. Last updated: 2026-03-27.*
+*Document maintained by Toni. Last updated: 2026-07-29.*

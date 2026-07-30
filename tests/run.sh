@@ -84,7 +84,14 @@ assert_file_lacks() {
 assert_count() {
   local name="$1" file="$2" pattern="$3" expected="$4"
   local count
-  count=$(grep -c "$pattern" "$file" 2>/dev/null || echo 0)
+  # 'grep -c' prints 0 and ALSO exits 1 when nothing matches, so a trailing
+  # '|| echo 0' appended a second zero and made count the two-line string
+  # '0\n0'. Bash then failed to evaluate it as arithmetic, so an assert_count
+  # with an expected 0 could never pass and reported a syntax error instead of a
+  # comparison. Take grep's own 0 and only default when it printed nothing,
+  # which is what a missing file does.
+  count=$(grep -c "$pattern" "$file" 2>/dev/null)
+  count=${count:-0}
   if [[ "$count" -eq "$expected" ]]; then ok "$name"
   else fail "$name (expected $expected x '$pattern', got $count)"; fi
 }
@@ -409,6 +416,58 @@ printf '# Testy — Role One — Extended\n\nBody.\n' > "$TITLE_DIR/testy.md"
 out=$(CLAUDE_TEAM_PROFILES="$TITLE_DIR" HOME="$TEST_HOME" "$CLI" list)
 assert_contains "multi-dash title keeps the full role" "Role One — Extended" "$out"
 rm -rf "$TITLE_DIR"
+echo ""
+
+# One stray '.md' with no H1 heading used to take out the whole roster.
+# profile_title was 'grep -m1 | sed', and under 'set -euo pipefail' the grep's
+# non-zero exit on no match killed the pipeline: 'list' exited 1 having printed
+# zero personas, with EMPTY stderr, and 'help' exited 0 with a silently empty
+# roster, because persona_roster runs inside process substitution where the
+# failure is invisible. A notes file or an editor backup in the profiles
+# directory was enough, and neither symptom said why.
+echo "a titleless file in the profiles directory"
+
+STRAY_DIR=$(mktemp -d)
+cp "$PROFILES_DIR"/*.md "$STRAY_DIR/"
+cp "$PROFILES_DIR/tiers.conf" "$STRAY_DIR/" 2>/dev/null || true
+printf -- '- a scratch note with no H1 heading\n- second line\n' > "$STRAY_DIR/notes.md"
+STRAY_ERR="$TEST_HOME/stray-list-stderr"
+STRAY_HELP_ERR="$TEST_HOME/stray-help-stderr"
+
+if stray_out=$(CLAUDE_TEAM_PROFILES="$STRAY_DIR" HOME="$TEST_HOME" "$CLI" list 2>"$STRAY_ERR"); then
+  ok "list still exits 0 with a titleless file present"
+else
+  fail "list still exits 0 with a titleless file present"
+fi
+stray_missing=""
+for profile in "$PROFILES_DIR"/*.md; do
+  pname=$(basename "$profile" .md)
+  case "$pname" in coordinator*) continue ;; esac
+  grep -qi "$pname" <<< "$stray_out" || stray_missing="$stray_missing $pname"
+done
+if [[ -z "$stray_missing" ]]; then ok "list still shows every real persona"
+else fail "list still shows every real persona (missing:$stray_missing)"; fi
+assert_file_has "list names the file it skipped"        "$STRAY_ERR" "notes.md"
+assert_count    "list names the skipped file once"      "$STRAY_ERR" "notes.md" 1
+
+if stray_help=$(CLAUDE_TEAM_PROFILES="$STRAY_DIR" HOME="$TEST_HOME" "$CLI" help 2>"$STRAY_HELP_ERR"); then
+  ok "help still exits 0 with a titleless file present"
+else
+  fail "help still exits 0 with a titleless file present"
+fi
+stray_missing=""
+for profile in "$PROFILES_DIR"/*.md; do
+  pname=$(basename "$profile" .md)
+  case "$pname" in coordinator*) continue ;; esac
+  grep -q "claude-team use $pname " <<< "$stray_help" || stray_missing="$stray_missing $pname"
+done
+if [[ -z "$stray_missing" ]]; then ok "help's roster is not silently truncated"
+else fail "help's roster is not silently truncated (missing:$stray_missing)"; fi
+assert_file_has "help names the file it skipped" "$STRAY_HELP_ERR" "notes.md"
+# The skip must not swallow a real persona whose title merely sits lower down.
+assert_not_contains "the titleless file is not listed as a persona" "notes" "$stray_out"
+rm -rf "$STRAY_DIR"
+rm -f "$STRAY_ERR" "$STRAY_HELP_ERR"
 echo ""
 
 # branch commands
@@ -773,6 +832,166 @@ fi
 rm -rf "$DMG_HOME"
 echo ""
 
+# Lock breaking. The CLI derives its host field from bash's own HOSTNAME, so
+# these fixtures compute it the same way; a mismatch would make every planted
+# lock look like it came from another machine and silently change which rule
+# applies to it.
+LOCK_HOST="${HOSTNAME:-$(uname -n 2>/dev/null || echo unknown)}"
+
+# A PID that is certainly dead: start a child, reap it, then reuse its number.
+# Linux and macOS both allocate PIDs increasing, so the number is not reissued
+# within the life of this suite.
+dead_pid() {
+  local p
+  sh -c 'exit 0' & p=$!
+  wait "$p" 2>/dev/null
+  printf '%s\n' "$p"
+}
+
+# Breaking a stale lock must have exactly one winner, and the way that is
+# achieved is observable: a stale lock is taken over IN PLACE, by renaming its
+# owner record aside, and the directory itself is never removed.
+#
+# Removing the directory is what could not be made safe, whichever way the
+# removal was claimed, because removing it frees the lock path and a mkdir can
+# land in that gap. Measured at 12 concurrent writers: 'rm -rf' lost updates in 6
+# of 30 runs, claiming the removal by renaming the directory aside still lost
+# them in 5 of 30, and adding a verify-and-rebuild cut it to 1 in 30. Taking over
+# in place measured 0 in 40.
+#
+# A sentinel file inside the planted lock is what separates the two designs. If
+# the lock was taken over in place, the sentinel is still there while the new
+# owner holds it. If the directory was deleted and recreated, it is gone.
+echo "lock breaking has a single winner"
+
+BREAK_HOME=$(mktemp -d)
+mkdir -p "$BREAK_HOME/.claude"
+BREAK_MD="$BREAK_HOME/.claude/CLAUDE.md"
+BREAK_LOCK="$BREAK_MD.lock"
+# About 2 MB, so the new owner holds the lock for long enough to look at. The
+# poll below spins in microseconds, so this only has to beat process startup.
+break_line=$(printf '%*s' 4096 '' | tr ' ' 'x')
+for ((_i = 0; _i < 500; _i++)); do printf '%s\n' "$break_line"; done > "$BREAK_MD"
+printf 'keep-this-line\n' >> "$BREAK_MD"
+mkdir -p "$BREAK_LOCK"
+: > "$BREAK_LOCK/sentinel"
+break_dead=$(dead_pid)
+printf '%s %s %s\n' "$LOCK_HOST" "$break_dead" "$(date '+%s')" > "$BREAK_LOCK/owner"
+
+( CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$BREAK_HOME" "$CLI" use akira >/dev/null 2>&1 ) &
+break_pid=$!
+break_saw_takeover=false
+break_in_place=false
+break_deadline=$((SECONDS + 20))
+while (( SECONDS < break_deadline )); do
+  break_owner=""
+  2>/dev/null read -r break_owner < "$BREAK_LOCK/owner" || true
+  # A record that no longer names the planted dead PID means the takeover is
+  # done. It is briefly absent mid-claim, which is why emptiness is not the test.
+  if [[ -n "$break_owner" && "$break_owner" != *" $break_dead "* ]]; then
+    break_saw_takeover=true
+    if [[ -e "$BREAK_LOCK/sentinel" ]]; then break_in_place=true; fi
+    break
+  fi
+  # Nothing left to observe once the write has landed. Without this the loop
+  # would spin to its deadline on a build that never takes the lock over.
+  if grep -qF "CLAUDE-TEAM:START" "$BREAK_MD" 2>/dev/null; then break; fi
+done
+wait "$break_pid" 2>/dev/null
+if [[ "$break_saw_takeover" == true ]]; then
+  ok "the takeover was observed, so this test is not vacuous"
+else
+  fail "the takeover was observed, so this test is not vacuous (never saw the record change)"
+fi
+if [[ "$break_in_place" == true ]]; then
+  ok "a stale lock is taken over in place, never deleted and recreated"
+else
+  fail "a stale lock is taken over in place, never deleted and recreated"
+fi
+assert_file_has "the contender still gets the lock and writes" "$BREAK_MD" "CLAUDE-TEAM:START"
+assert_file_has "taking over a lock preserves user content"    "$BREAK_MD" "keep-this-line"
+if [[ ! -d "$BREAK_LOCK" ]]; then ok "no lock directory remains after a takeover"
+else fail "no lock directory remains after a takeover"; fi
+break_left=$(find "$BREAK_HOME/.claude" -maxdepth 1 -name 'CLAUDE.md.lock*' 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$break_left" == "0" ]]; then ok "a takeover leaves no lock litter beside the target"
+else fail "a takeover leaves no lock litter beside the target (found $break_left)"; fi
+rm -rf "$BREAK_HOME"
+
+# SIGKILL between the rename and the removal is the one case the traps cannot
+# cover, and it leaves an inert '<lock>.dead.<pid>' directory that nothing
+# reads. The next break must sweep it, or a machine that crashes under load
+# accumulates them beside the user's CLAUDE.md forever.
+SWEEP_HOME=$(mktemp -d)
+mkdir -p "$SWEEP_HOME/.claude"
+SWEEP_MD="$SWEEP_HOME/.claude/CLAUDE.md"
+SWEEP_LOCK="$SWEEP_MD.lock"
+printf 'keep-this-line\n' > "$SWEEP_MD"
+mkdir -p "$SWEEP_LOCK" "$SWEEP_LOCK.dead.999001" "$SWEEP_LOCK.dead.999002/nested"
+printf 'leftover owner record\n' > "$SWEEP_LOCK.dead.999001/owner"
+printf '%s %s %s\n' "$LOCK_HOST" "$(dead_pid)" "$(date '+%s')" > "$SWEEP_LOCK/owner"
+CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$SWEEP_HOME" "$CLI" use akira >/dev/null 2>&1
+sweep_left=$(find "$SWEEP_HOME/.claude" -maxdepth 1 -name 'CLAUDE.md.lock.dead.*' 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$sweep_left" == "0" ]]; then ok "a break sweeps renamed-aside directories a killed winner left behind"
+else fail "a break sweeps renamed-aside directories a killed winner left behind (found $sweep_left)"; fi
+assert_file_has "the write still lands alongside the sweep" "$SWEEP_MD" "CLAUDE-TEAM:START"
+rm -rf "$SWEEP_HOME"
+echo ""
+
+# Liveness must outrank the age rule. The 120-second age test used to run first
+# and independently of kill -0, so a live holder that had been paused lost a lock
+# it still held and both writers then reported success on a write only one of
+# them kept. SIGSTOP, a laptop suspend mid-command, and a clock stepping forward
+# all produce exactly that state.
+echo "liveness outranks the lock age rule"
+
+LIVE_HOME=$(mktemp -d)
+mkdir -p "$LIVE_HOME/.claude"
+LIVE_MD="$LIVE_HOME/.claude/CLAUDE.md"
+LIVE_LOCK="$LIVE_MD.lock"
+printf 'keep-this-line\n' > "$LIVE_MD"
+mkdir -p "$LIVE_LOCK"
+sleep 30 &
+live_holder=$!
+# Acquired far beyond LOCK_STALE_SECONDS, by a process that is still running.
+printf '%s %s %s\n' "$LOCK_HOST" "$live_holder" "$(( $(date '+%s') - 100000 ))" > "$LIVE_LOCK/owner"
+( CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$LIVE_HOME" "$CLI" use akira >/dev/null 2>&1 ) &
+live_contender=$!
+# One second is twenty poll intervals. The age-first order broke this lock on
+# the first one.
+sleep 1
+if [[ -d "$LIVE_LOCK" ]] && [[ "$(cat "$LIVE_LOCK/owner" 2>/dev/null)" == *" $live_holder "* ]]; then
+  ok "an ancient lock held by a live PID is not broken"
+else
+  fail "an ancient lock held by a live PID is not broken (the contender took it)"
+fi
+assert_file_lacks "the contender writes nothing while a live holder holds the lock" \
+  "$LIVE_MD" "CLAUDE-TEAM:START"
+kill "$live_contender" 2>/dev/null
+wait "$live_contender" 2>/dev/null
+kill "$live_holder" 2>/dev/null
+wait "$live_holder" 2>/dev/null
+rm -rf "$LIVE_HOME"
+
+# The age rule still has to work where liveness cannot be established, which is
+# the case it exists for: a lock recorded by another host, as happens when $HOME
+# is shared over NFS and that machine crashed. The PID here is deliberately a
+# LIVE one, so this fails if the host check ever stops gating the kill -0.
+FOREIGN_HOME=$(mktemp -d)
+mkdir -p "$FOREIGN_HOME/.claude"
+FOREIGN_MD="$FOREIGN_HOME/.claude/CLAUDE.md"
+printf 'keep-this-line\n' > "$FOREIGN_MD"
+mkdir -p "$FOREIGN_MD.lock"
+printf 'some-other-host %s %s\n' "$$" "$(( $(date '+%s') - 100000 ))" > "$FOREIGN_MD.lock/owner"
+if CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$FOREIGN_HOME" "$CLI" use akira >/dev/null 2>&1; then
+  ok "an ancient lock from another host is still broken by the age rule"
+else
+  fail "an ancient lock from another host is still broken by the age rule"
+fi
+assert_file_has "the write lands after breaking another host's ancient lock" \
+  "$FOREIGN_MD" "CLAUDE-TEAM:START"
+rm -rf "$FOREIGN_HOME"
+echo ""
+
 # Shared-state concurrency. ~/.claude/branches/INDEX.md and ~/.claude/CLAUDE.md
 # are shared across every session on the machine, and parallel sessions are the
 # product's headline feature, so concurrent access is the designed-for case.
@@ -825,6 +1044,64 @@ assert_count "concurrent writers leave one team block"        "$CONC_MD" "CLAUDE
 assert_count "concurrent writers leave one coordinator block" "$CONC_MD" "CLAUDE-COORDINATOR:START" 1
 assert_count "concurrent writers keep user content"           "$CONC_MD" "keep-this-line"           1
 rm -rf "$CONC_HOME"
+
+# The same storm, but starting from a stale lock, which is the state that made
+# lock breaking the dangerous part: every contender arrives, agrees the holder is
+# gone, and races to remove. Every writer here is a rewriter with its own
+# distinct transition to apply, so any two contenders that end up inside the
+# critical section together must lose one of them.
+#
+# This is a probabilistic detector, and deliberately kept as one. The window
+# between a contender's staleness verdict and its removal is microseconds wide,
+# so on the unfixed code this storm reproduced the lost update in roughly 1 run
+# in 6 at this size, and more often under CPU load. It is here to guard the
+# end-to-end invariant that no row is ever lost; the deterministic proofs of the
+# single-winner rename are in the 'lock breaking has a single winner' section.
+STALE_HOME=$(mktemp -d)
+STALE_INDEX="$STALE_HOME/.claude/branches/INDEX.md"
+mkdir -p "$STALE_HOME/.claude"
+STALE_ROOT=$(mktemp -d)
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  git init -q "$STALE_ROOT/r$i"
+  (cd "$STALE_ROOT/r$i" && git commit -q --allow-empty -m init)
+  (cd "$STALE_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$STALE_HOME" "$CLI" branch start "feat/s$i" >/dev/null 2>&1)
+done
+mkdir -p "$STALE_INDEX.lock"
+printf '%s %s %s\n' "$LOCK_HOST" "$(dead_pid)" "$(date '+%s')" > "$STALE_INDEX.lock/owner"
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  (cd "$STALE_ROOT/r$i" && CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$STALE_HOME" "$CLI" branch "done" >/dev/null 2>&1) &
+done
+wait
+# merged == 12 with rows == 12 is what pins it: a discarded rewrite leaves its
+# row behind as 'active', so the row count alone would not move.
+assert_count    "a stale lock plus 12 writers keeps every row"       "$STALE_INDEX" '^| 2'       12
+assert_count    "a stale lock plus 12 writers applies every rewrite" "$STALE_INDEX" '| merged |' 12
+assert_file_has "a stale lock plus 12 writers keeps the header"      "$STALE_INDEX" "Branch Index"
+if [[ ! -d "$STALE_INDEX.lock" ]]; then ok "the storm leaves no lock directory behind"
+else fail "the storm leaves no lock directory behind"; fi
+stale_left=$(find "$STALE_HOME/.claude/branches" -maxdepth 1 -name 'INDEX.md.lock.dead.*' 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$stale_left" == "0" ]]; then ok "the storm leaves no renamed-aside lock behind"
+else fail "the storm leaves no renamed-aside lock behind (found $stale_left)"; fi
+if [[ -z "$(find "$STALE_HOME/.claude" -name '.claude-team.*' 2>/dev/null)" ]]; then
+  ok "the storm leaves no temp file behind"
+else fail "the storm leaves no temp file behind"; fi
+rm -rf "$STALE_ROOT"
+
+# CLAUDE.md under the same conditions: a stale lock, then writers on both of its
+# independent marker blocks.
+STALE_MD="$STALE_HOME/.claude/CLAUDE.md"
+printf 'keep-this-line\n' > "$STALE_MD"
+mkdir -p "$STALE_MD.lock"
+printf '%s %s %s\n' "$LOCK_HOST" "$(dead_pid)" "$(date '+%s')" > "$STALE_MD.lock/owner"
+for _ in 1 2 3 4 5; do
+  (CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$STALE_HOME" "$CLI" use akira >/dev/null 2>&1) &
+  (CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$STALE_HOME" "$CLI" coordinator on >/dev/null 2>&1) &
+done
+wait
+assert_count "a stale lock plus writers leaves one team block"        "$STALE_MD" "CLAUDE-TEAM:START"        1
+assert_count "a stale lock plus writers leaves one coordinator block" "$STALE_MD" "CLAUDE-COORDINATOR:START" 1
+assert_count "a stale lock plus writers keeps user content"           "$STALE_MD" "keep-this-line"           1
+rm -rf "$STALE_HOME"
 echo ""
 
 # Temp files must be created beside their destination, not in TMPDIR. A
@@ -859,6 +1136,63 @@ if [[ -z "$(find "$TMP_HOME" -name '.claude-team.*' 2>/dev/null)" ]]; then
   ok "no temp file litter left in ~/.claude"
 else fail "no temp file litter left in ~/.claude"; fi
 rm -rf "$TMP_HOME" "$TMP_REPO"
+echo ""
+
+# An interrupted write must not leave its temp file behind. tmp_beside documents
+# that it registers the file in _TMP_FILE for the cleanup traps, but every caller
+# read it as tmp=$(tmp_beside ...), and command substitution runs the function in
+# a subshell: the assignment landed in a child that then exited, the parent's
+# _TMP_FILE stayed empty, and _cleanup could never remove anything. Reproduced as
+# a 150 MB orphan beside CLAUDE.md after a SIGINT mid-rewrite.
+echo "an interrupted write leaves no temp file behind"
+
+INT_HOME=$(mktemp -d)
+mkdir -p "$INT_HOME/.claude"
+INT_MD="$INT_HOME/.claude/CLAUDE.md"
+# A CLAUDE.md of about 8 MB. Bash defers a trap until the foreground child it is
+# waiting on returns, so the signal only has to arrive before the rename, not
+# inside a narrow window; the size is what makes the copy into the temp file long
+# enough for that to be comfortable rather than tight.
+int_line=$(printf '%*s' 4096 '' | tr ' ' 'x')
+for ((_i = 0; _i < 2000; _i++)); do printf '%s\n' "$int_line"; done > "$INT_MD"
+
+( CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$INT_HOME" "$CLI" use akira >/dev/null 2>&1 ) &
+int_pid=$!
+int_saw_tmp=false
+int_deadline=$((SECONDS + 20))
+while (( SECONDS < int_deadline )); do
+  for _t in "$INT_HOME/.claude"/.claude-team.*; do
+    if [[ -f "$_t" ]]; then int_saw_tmp=true; break 2; fi
+  done
+  if grep -qF "CLAUDE-TEAM:START" "$INT_MD" 2>/dev/null; then break; fi
+done
+if [[ "$int_saw_tmp" == true ]]; then
+  kill -INT "$int_pid" 2>/dev/null
+  ok "the temp file window was observed, so this test is not vacuous"
+else
+  fail "the temp file window was observed, so this test is not vacuous (the write finished first: enlarge the fixture)"
+fi
+wait "$int_pid" 2>/dev/null
+# Assert what the design actually guarantees, which is that a reader sees the
+# whole old file or the whole new one, never a partial write. Whether the rename
+# beat the signal is timing, not correctness: seeing the temp file appear does
+# not prove the signal arrived before tmp_commit, because the rename can land in
+# the microseconds between the two. An earlier version asserted the write had
+# not landed and failed on macOS for exactly that reason, where process spawn is
+# slower and the window sits differently.
+int_starts=$(grep -cF "CLAUDE-TEAM:START" "$INT_MD" 2>/dev/null || true)
+int_ends=$(grep -cF "CLAUDE-TEAM:END" "$INT_MD" 2>/dev/null || true)
+if [[ "$int_starts" == "$int_ends" && ( "$int_starts" == "0" || "$int_starts" == "1" ) ]]; then
+  ok "an interrupted write leaves the file coherent, not half-written"
+else
+  fail "an interrupted write leaves the file coherent, not half-written ($int_starts start, $int_ends end)"
+fi
+# The user's own content must survive either outcome.
+assert_count "an interrupted write preserves every user line" "$INT_MD" "^$int_line$" 2000
+int_orphans=$(find "$INT_HOME/.claude" -maxdepth 1 -name '.claude-team.*' 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$int_orphans" == "0" ]]; then ok "SIGINT mid-write leaves no temp file beside the target"
+else fail "SIGINT mid-write leaves no temp file beside the target (found $int_orphans)"; fi
+rm -rf "$INT_HOME"
 echo ""
 
 # launch + plugin surfaces
@@ -1139,6 +1473,44 @@ assert_contains "sync says slash commands are live now"        "No restart neede
 assert_contains "sync says subagents wait for a new session"   "Next session"      "$out"
 rm -rf "$SYNC_REPO" "$SYNC_HOME"
 
+# A sync that fails part-way must say so. Measured on the unchecked version:
+# 'set -e' already stopped it and already exited 1, so the exit code and the
+# stopping were never the problem. What the user got was a raw 'cp: cannot
+# overwrite directory' line, a green checkmark on the batch that HAD landed, and
+# nothing naming the state that leaves behind: profiles new, subagents and slash
+# commands still on the previous version. That divergence is the one thing this
+# command exists to prevent and the one thing nothing else warns about.
+#
+# So of the assertions below, the three message checks are the real regression
+# controls; the exit code and the stop-before-the-next-surface checks already
+# held and are kept to pin them against a future '|| true'.
+#
+# The failure is forced with a DIRECTORY sitting where a file has to land, which
+# fails for root too. A chmod would not: this suite may run as root, and there
+# the permission bits are advisory, so a chmod-based fixture would pass
+# vacuously on exactly the machine most likely to run it.
+SYNCFAIL_REPO=$(mktemp -d)
+SYNCFAIL_HOME=$(mktemp -d)
+cp -R "$REPO_DIR"/profiles "$REPO_DIR"/commands "$REPO_DIR"/agents \
+      "$REPO_DIR"/scripts "$REPO_DIR"/bin "$SYNCFAIL_REPO/"
+mkdir -p "$SYNCFAIL_HOME/.claude/agents/robin.md"
+if out=$(HOME="$SYNCFAIL_HOME" bash "$SYNCFAIL_REPO/bin/claude-team" sync 2>&1); then
+  fail "sync exits nonzero when a surface cannot be copied"
+else
+  ok "sync exits nonzero when a surface cannot be copied"
+fi
+assert_contains "the sync failure names the divergence"    "surfaces may now hold different versions" "$out"
+assert_contains "the sync failure says rerunning heals it" "rerun" "$out"
+assert_contains "the sync failure names the failing copy"  "Failed to copy subagents" "$out"
+# Stopping is the point: continuing is what produced the divergence silently.
+assert_not_contains "a failed sync stops before the next surface" "Slash commands synced" "$out"
+if [[ ! -f "$SYNCFAIL_HOME/.claude/commands/robin.md" ]]; then
+  ok "a failed sync does not go on to install the later surface"
+else
+  fail "a failed sync does not go on to install the later surface"
+fi
+rm -rf "$SYNCFAIL_REPO" "$SYNCFAIL_HOME"
+
 echo ""
 
 # Messaging accuracy. Nothing asserted any of these strings before, so a
@@ -1203,6 +1575,44 @@ if [[ "$hookrefs" == "1" ]]; then
 else
   fail "reinstall does not duplicate the SessionStart hook (found $hookrefs)"
 fi
+
+# The coordinator prompt used a bare 'read', which returns non-zero at end of
+# file, and under 'set -e' that ended the installer right there: exit 1, no
+# summary, coordinator unconfigured, and every earlier step already applied.
+# 'bash install.sh < /dev/null' is what CI and any pipe look like.
+EOF_HOME=$(mktemp -d)
+if eof_out=$( (cd "$INSTALL_REPO" && HOME="$EOF_HOME" bash install.sh < /dev/null) 2>&1 ); then
+  ok "install.sh exits 0 with stdin at end of file"
+else
+  fail "install.sh exits 0 with stdin at end of file"
+fi
+assert_contains "a non-interactive install still reaches its summary" "Done!" "$eof_out"
+if [[ -f "$EOF_HOME/.claude/team/robin.md" ]]; then ok "a non-interactive install still installs profiles"
+else fail "a non-interactive install still installs profiles"; fi
+# End of file means nobody is present to consent, and the casual path writes a
+# block into the user's own global CLAUDE.md. Skipping is the safe reading.
+# This one also held before the fix, for the wrong reason: the installer died at
+# the prompt and so never reached the coordinator either way. The assertions that
+# actually separate the two are the exit code and the summary above.
+if ! grep -qF "CLAUDE-COORDINATOR:START" "$EOF_HOME/.claude/CLAUDE.md" 2>/dev/null; then
+  ok "end of file skips the coordinator instead of editing the global CLAUDE.md"
+else
+  fail "end of file skips the coordinator instead of editing the global CLAUDE.md"
+fi
+assert_contains "the installer says why it skipped the coordinator" "end of file" "$eof_out"
+rm -rf "$EOF_HOME"
+
+# Pressing Enter is a person choosing the default, and must still mean casual.
+# Treating end of file as the default is what this separates it from.
+ENTER_HOME=$(mktemp -d)
+if (cd "$INSTALL_REPO" && printf '\n' | HOME="$ENTER_HOME" bash install.sh >/dev/null 2>&1); then
+  ok "install.sh runs clean when the coordinator prompt gets a bare Enter"
+else
+  fail "install.sh runs clean when the coordinator prompt gets a bare Enter"
+fi
+assert_file_has "a bare Enter still means casual" "$ENTER_HOME/.claude/CLAUDE.md" "CLAUDE-COORD-MODE: casual"
+rm -rf "$ENTER_HOME"
+
 rm -rf "$INSTALL_HOME" "$INSTALL_REPO"
 
 echo ""
