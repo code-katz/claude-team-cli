@@ -42,6 +42,8 @@ bash tests/run.sh
 
 6. Commit the regenerated `agents/` and `commands/` files alongside the profile. They are committed artifacts, not build output.
 
+7. **Search for stale rosters.** Adding or removing a persona changes how many there are and what they're named, and no test catches a doc that still says the old number. Grep the repo for the persona's name and for the old count, numeral and spelled out, and fix every doc that lists personas individually or states the total. Where you can, point the doc at `claude-team list` instead of hand-listing the roster again: a command that reads the roster live cannot drift, and a copy always can.
+
 Coordinator profiles (`profiles/coordinator.md`, `profiles/coordinator-prod.md`) are exempt. The generator skips them, and they need no `## Greeting`.
 
 ## Before you push
