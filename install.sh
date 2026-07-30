@@ -99,8 +99,24 @@ echo "  $(bold "casual") (default): commit directly to main — no branch enforc
 echo "  $(bold "prod"):             branch required before any code; worktrees + MR/PR flow."
 echo ""
 printf "  Enable the coordinator now? [casual/prod/n] (default: casual) "
-read -r coord_answer
-coord_answer="${coord_answer:-casual}"
+# A bare 'read' returns non-zero at end of file, and under 'set -e' that ended
+# the install right here: 'bash install.sh < /dev/null', a CI job, or any pipe
+# exited 1 mid-prompt with no summary and the coordinator unconfigured, after
+# every earlier step had already been applied.
+#
+# End of file is not the same as pressing Enter. Enter is a person choosing the
+# default; end of file means nobody is present to choose, and the casual path
+# writes a block into the user's global ~/.claude/CLAUDE.md. So Enter still
+# means casual, and end of file skips the coordinator rather than editing a
+# global file unattended. The user can enable it later in one command.
+coord_answer=""
+if read -r coord_answer; then
+  coord_answer="${coord_answer:-casual}"
+else
+  echo ""
+  echo "  $(yellow "!") No answer on stdin (end of file), so the coordinator stays off."
+  coord_answer="n"
+fi
 
 # Delegate to the CLI just installed: it owns the marker-block editing
 # (atomic replace-or-append), so the logic lives in exactly one place and
