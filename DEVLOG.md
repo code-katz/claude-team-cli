@@ -5,6 +5,43 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-31] The README sold an install path that does not exist
+
+**Category:** `bugfix`
+**Tags:** `readme`, `positioning`, `plugin`, `doc-drift`, `ci`, `model-tiers`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+An accuracy audit of `README.md` found seven drifts, six of them mechanical. The seventh was not: plugin packaging, advertised twice as a headline v2.0 feature, has never been installable. A structural pass then moved the pitch above the roster.
+
+### Detail
+
+**The real finding.** The README sold "install everything via the plugin system" in two places, under a v2 thesis reading "every install path ends up with the same working setup." Neither half holds, for two independent reasons. There is no `marketplace.json`, and `git log --all -- '*marketplace*'` returns nothing, so it never existed on any branch and `/plugin marketplace add` has nothing to read. Separately, `bin/claude-team:15` resolves `PROFILES_DIR` to `~/.claude/team`, which is populated only by `claude-team sync`, which only `install.sh:51` runs. A plugin install executes nothing, so the CLI would die in `require_profiles_dir` even with a marketplace entry, taking out `list`, `use`, `launch`, `status`, both coordinator commands, and every shipped slash command that shells out to them. "CLI on PATH" also conflated the Bash tool's PATH with the user's interactive shell; those are different promises. `tests/run.sh:1218` asserts only that `plugin.json` is valid JSON, which is why a false headline feature survived a release.
+
+**Why the mechanical six drifted.** Five were hand-maintained copies of directory listings that the filesystem already owns: `claude-team show`/`use` enumerated 12 of 17 personas, stopping at kai; the `commands/` tree listed 21 of 27 files; the `profiles/` and `bin/` trees hid `coordinator-prod.md`, `tiers.conf`, and `team-session-start`. The sixth listed `/branch` and `/parallel` under "companion skill commands" though both ship in this repo, so a reader who skipped the curl block would believe they did not have them.
+
+**Structure.** The page did not say why anyone should care until line 101, below a seventeen-name roster, a changelog, and the entire Installation section. That order serves the returning user, who has intent and will scroll, at the expense of the evaluator, who has neither. For a novel category the concept has to land before the value is legible.
+
+### Decisions Made
+
+- **Deleted the test count rather than corrected it.** It had read 123, 128, 135, and 223 across README and ROADMAP while the suite actually ran 258, so it has never once been right. A number that keeps drifting is a poor argument for a release branded on dependability, and CI already proves the same thing without going stale. Replaced with a CI badge plus the coverage clause naming the risky surfaces, which was always the reassuring part; the number in front of it was the liability.
+- **Stopped enumerating, rather than re-enumerating.** Adding the five missing names and six missing files would have replanted the identical bug on persona eighteen. Replaced with a pattern plus a pointer at `claude-team list`, keeping per-file detail only where it carries information available nowhere else. Net 76 lines deleted against 50 added.
+- **Fixed the plugin copy, did not build the plugin.** Rejected shipping `marketplace.json` alone: it would make the claim half-true, since the CLI still could not run. The full fix is roughly half a day, and the honest cost driver is clean-machine verification of a path nobody has ever executed, not the diff.
+- **Rejected folding the reorder into the accuracy commit.** Verifiable corrections and a positioning judgment deserve separate diffs and separate scrutiny.
+
+### Related
+
+- Commits `27f4dfe` (accuracy), `2010acc` (structure and plugin copy)
+- [2026-07-04] v0.7 — where the plugin claim originated, now partially superseded
+- [2026-03-10] README overhaul — established the section ordering this changes
+- Delegated reviews: Toni (positioning), Akira (plugin verification). Session led by River.
+- **Tool gap worth its own work:** the first Akira delegation died on `You've reached your Fable 5 limit`, because `profiles/tiers.conf` pins akira to `claude-fable-5`. Re-running on Opus succeeded. A delegation that hard-fails on budget with no fallback is a worse failure mode than one that degrades to an available tier.
+
+---
+
 ## [2026-07-30] Coordinator knew one handoff route out of three
 
 **Category:** `bugfix`
@@ -441,6 +478,7 @@ Expanded the team from twelve to sixteen with a Game Development Team for card a
 ---
 
 ## [2026-07-04] v0.7: Session-scoped personas, launcher with model tiers, plugin packaging
+> **PARTIALLY SUPERSEDED [2026-07-31]:** The plugin packaging claims are false and always were. "The repo installs as a plugin" (Summary) and "Plugin manifest ships commands, agents, hooks, and the CLI on PATH" (Detail) describe a path that has never been installable: no `marketplace.json` has ever existed on any branch, and a plugin install never runs `claude-team sync`, so the CLI cannot find its profiles. Replaced by [2026-07-31] The README sold an install path that does not exist. Everything else in this entry remains current: session-scoped personas, `claude-team launch`, delegation subagents, worktree-isolated `/parallel`, and the SessionStart hook.
 
 **Category:** `milestone`
 **Tags:** `personas`, `launch`, `worktrees`, `plugin`, `subagents`, `fable-5`, `v0.7`
@@ -748,6 +786,7 @@ Rewrote the Casey (Data Analyst & Visualization) persona profile to deeply embed
 ---
 
 ## [2026-03-10] README overhaul — positioning, structure, and conversion content
+> **PARTIALLY SUPERSEDED [2026-07-31]:** The section ordering is stale. The team summary table no longer sits "near the top"; the pitch (The Idea, See the Difference, Who This Is For) now precedes it, and Installation follows the roster. Replaced by [2026-07-31] The README sold an install path that does not exist. The content decisions in this entry remain current: Robin as the before/after example, and a deliberately short two-paragraph ICP.
 
 **Category:** `milestone`
 **Tags:** `readme`, `positioning`, `documentation`, `v0.3`
