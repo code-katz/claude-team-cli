@@ -1583,6 +1583,62 @@ rm -rf "$INSTALL_HOME" "$INSTALL_REPO"
 
 echo ""
 
+# sync only ever copies. Deleting or renaming a persona in the clone therefore
+# leaves its three installed files behind, and the roster is read from the
+# installed profiles rather than from the repo, so the removed persona keeps
+# appearing in 'claude-team list' and its '/<name>' command keeps resolving.
+#
+# Runs from a throwaway copy of the repo, never REPO_DIR, for the reason given
+# in the install.sh block above: sync resolves its repo directory from the CLI's
+# own path and regenerates agents/ and commands/ there, so running it against the
+# real clone would rewrite this repo's own tracked files.
+echo "sync reports personas left behind by a delete or rename"
+
+SYNC_REPO=$(mktemp -d)
+cp -R "$REPO_DIR"/profiles "$REPO_DIR"/commands "$REPO_DIR"/agents \
+      "$REPO_DIR"/scripts "$REPO_DIR"/bin "$SYNC_REPO/"
+SYNC_HOME=$(mktemp -d)
+SYNC_CLI="$SYNC_REPO/bin/claude-team"
+# HOME only, with no CLAUDE_TEAM_PROFILES: the point of this test is the default
+# installed location, which is what sync compares the repo against.
+out=$(HOME="$SYNC_HOME" "$SYNC_CLI" sync 2>&1)
+assert_not_contains "a clean sync reports nothing left behind" "no longer in the repo" "$out"
+
+# Guard the guard: if this persona is ever renamed, the removal below becomes a
+# no-op and every assertion after it would pass for the wrong reason.
+if [[ -f "$SYNC_REPO/profiles/piper.md" ]]; then
+  ok "the persona to remove exists, so these tests are not vacuous"
+else
+  fail "the persona to remove exists, so these tests are not vacuous (piper renamed: repoint this test)"
+fi
+rm -f "$SYNC_REPO/profiles/piper.md" "$SYNC_REPO/agents/piper.md" "$SYNC_REPO/commands/piper.md"
+out=$(HOME="$SYNC_HOME" "$SYNC_CLI" sync 2>&1)
+assert_contains "sync names the persona left behind"     "piper"                 "$out"
+assert_contains "sync says why it is still installed"    "no longer in the repo" "$out"
+assert_contains "sync prints the command that clears it" "rm -f"                 "$out"
+
+# Reported, not deleted. sync shares ~/.claude/commands and ~/.claude/agents with
+# files it never wrote, and has no marker separating its own from a user's, so it
+# must not rm on a guess about ownership.
+if [[ -f "$SYNC_HOME/.claude/team/piper.md" ]]; then ok "sync deletes no leftover profile"
+else fail "sync deletes no leftover profile (IT WAS DELETED)"; fi
+if [[ -f "$SYNC_HOME/.claude/commands/piper.md" ]]; then ok "sync deletes no leftover slash command"
+else fail "sync deletes no leftover slash command (IT WAS DELETED)"; fi
+if [[ -f "$SYNC_HOME/.claude/agents/piper.md" ]]; then ok "sync deletes no leftover subagent"
+else fail "sync deletes no leftover subagent (IT WAS DELETED)"; fi
+
+# A persona still in the repo must not be reported, or the warning is noise.
+# Scoped to the report line, not the whole run: say_session_scope prints
+# "slash commands (/akira, /robin, ...)" on every sync, so asserting against all
+# of $out would fail on text that has nothing to do with this check.
+orphan_report=$(grep "no longer in the repo" <<< "$out" || true)
+assert_not_contains "the report names only the removed persona" "robin" "$orphan_report"
+# The leftover showing in the roster is the symptom the report exists to explain.
+out=$(CLAUDE_TEAM_PROFILES="$SYNC_HOME/.claude/team" HOME="$SYNC_HOME" "$SYNC_CLI" list 2>&1)
+assert_contains "the leftover persona still shows in list, which is the symptom" "Piper" "$out"
+rm -rf "$SYNC_REPO" "$SYNC_HOME"
+echo ""
+
 # ─── Documentation drift ──────────────────────────────────────────────────────
 #
 # Five sessions in a row ran an open-ended "review the docs for drift" prompt
