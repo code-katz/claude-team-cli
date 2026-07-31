@@ -16,7 +16,7 @@ v1 delivered the roster and the coordinator. v2 closes the gaps that made the te
 - [x] Session-scoped personas: the `/name` commands no longer write global state, so parallel sessions never overwrite each other
 - [x] `claude-team launch <persona>` — a dedicated session with the persona as system prompt, on its tier model, optionally in an isolated worktree
 - [x] Seventeen delegation subagents generated from `profiles/`, so any session can hand work to a specialist without switching
-- [x] Plugin-shaped layout: `commands/`, `agents/`, and `hooks/hooks.json` sit at the paths Claude Code's plugin system expects, and `.claude-plugin/plugin.json` describes the package. The repo is not published to a marketplace yet, so `bash install.sh` remains the install path
+- [x] Plugin-shaped layout: `commands/`, `agents/`, and `hooks/hooks.json` sit at the paths Claude Code's plugin system expects, and `.claude-plugin/plugin.json` describes the package. Publishing to a plugin marketplace is retired, not deferred (see Near-Term). `bash install.sh` is the install path
 - [x] Worktree-isolated `/parallel`: session plans create a worktree per session and never switch branches in a shared checkout
 - [x] `claude-team sync` — one command propagates a profile edit to all three installed copies
 - [x] `claude-team install-hook` — the SessionStart hook registers by absolute path in `settings.json`, so it works on the `install.sh` path instead of only through the plugin manifest
@@ -48,6 +48,8 @@ Customizing a persona has two supported paths, both of which keep one source of 
 
 Slash command generation shipped in v2.0 and is no longer queued. `scripts/generate-agents.sh` now writes both the delegation subagent and the `/name` slash command from the profile, so adding a persona means writing one profile.
 
+**Marketplace publishing is retired, not deferred.** A full packaging plan was built and costed at roughly two days, and the engineering was never the problem. Two structural limits are: the plugin system namespaces commands, so `/akira` becomes `/claude-team:akira`, and a plugin cannot put `claude-team` in the user's shell, only on the Bash tool's path, so `launch`, `session`, and the worktree workflow could not ship through it. That is not a subset of the product, it is a different and worse product wearing its name. The layout stays plugin-shaped because it costs nothing, but `bash install.sh` is the install path.
+
 ---
 
 ## Aspirational — Looking for Feedback
@@ -66,4 +68,5 @@ That is an invitation, not a finish line. If something about the team gets in yo
 | 2026-07-29 | snapshot | Renumbered to v2.0 current, v1.0 shipped; pre-release `0.x` numbers retired. Corrected test count to 135. Local profile overrides promoted to top priority. |
 | 2026-07-29 | decision | Local profile overrides and team-scoped profiles retired. Both create a second source of persona truth competing with the repo. Supported paths are a pull request or a fork, documented in CONTRIBUTING.md. |
 | 2026-07-29 | correction | Session handoff briefing moved from aspirational to shipped. It was built with the personas and the entry was stale; the real defect was that the brief never reached the `/name` slash commands. Parallel session prompts gained a Context field. Aspirational list is now empty. |
+| 2026-07-31 | decision | Marketplace publishing retired. A costed packaging plan showed the plugin form cannot deliver `/akira` (namespaced to `/claude-team:akira`) and cannot put `claude-team` in the user's shell, so `launch`, `session`, and the worktree workflow are unavailable through it. Shipping a subset under the product's name was judged worse than not shipping it. `.claude-plugin/` and `hooks/hooks.json` stay because the layout costs nothing. |
 | 2026-07-31 | correction | "Plugin packaging: installed in one step" was false and always was. There is no `marketplace.json`, and a plugin-only install never runs `claude-team sync`, so the CLI dies in `require_profiles_dir`. Restated as plugin-shaped layout, matching the wording in README. The same claim was corrected in README on 2026-07-31 but missed here, so the two now share one wording and a CI check asserts no doc claims a marketplace install path while `marketplace.json` is absent. |

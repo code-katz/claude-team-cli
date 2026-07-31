@@ -597,7 +597,7 @@ v1 gave you the team. v2 makes the team dependable: every session gets its own p
 
 **Tested on Linux and macOS** — shellcheck plus the full suite run in CI on every push and pull request, covering the CLI commands, both coordinator modes, and the install path.
 
-**Plugin-shaped layout** — `commands/`, `agents/`, and `hooks/hooks.json` sit at the paths Claude Code's plugin system expects, and `.claude-plugin/plugin.json` describes the package. The repo is not published to a marketplace yet, so `bash install.sh` remains the install path. See [Installation](#installation).
+**Plugin-shaped layout** — `commands/`, `agents/`, and `hooks/hooks.json` sit at the paths Claude Code's plugin system expects, and `.claude-plugin/plugin.json` describes the package. Publishing to a plugin marketplace is not planned: the plugin system namespaces commands, so `/akira` would become `/claude-team:akira`, and it cannot put `claude-team` in your shell, which `launch` and `session` need. `bash install.sh` is the install path. See [Installation](#installation).
 
 ### v1.0
 
