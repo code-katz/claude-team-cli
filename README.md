@@ -10,7 +10,7 @@
 
 > Your AI development team. Seventeen specialists, one CLI, zero meetings.
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Bash 4+](https://img.shields.io/badge/bash-4%2B-green) ![Works with Claude Code](https://img.shields.io/badge/works%20with-Claude%20Code-8A2BE2)
+[![CI](https://github.com/code-katz/claude-team-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/code-katz/claude-team-cli/actions/workflows/ci.yml) ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Bash 4+](https://img.shields.io/badge/bash-4%2B-green) ![Works with Claude Code](https://img.shields.io/badge/works%20with-Claude%20Code-8A2BE2)
 
 ---
 
@@ -378,36 +378,18 @@ Branch state persists across sessions and across projects. Use `claude-team bran
 ## Usage
 
 ```bash
-# See your team
+# See your team — the canonical roster of all seventeen
 claude-team list
 
-# Read a team member's full profile
+# Read any team member's full profile
 claude-team show river
-claude-team show akira
-claude-team show sasha
-claude-team show jordan
-claude-team show casey
 claude-team show morgan
-claude-team show alex
-claude-team show robin
-claude-team show toni
-claude-team show quinn
-claude-team show sage
-claude-team show kai
+claude-team show cornelius
 
-# Activate a team member
-claude-team use river     # River (Product Management)
-claude-team use akira     # Akira (Backend Engineering)
-claude-team use sasha     # Sasha (Frontend Engineering)
-claude-team use jordan    # Jordan (Data & ML)
-claude-team use casey     # Casey (Data Analytics)
-claude-team use morgan    # Morgan (Security Engineering)
-claude-team use alex      # Alex (DevOps & Platform)
-claude-team use robin     # Robin (QA & Testing)
-claude-team use toni      # Toni (Product Marketing)
-claude-team use quinn     # Quinn (Project Management)
-claude-team use sage      # Sage (Business Advisor)
-claude-team use kai       # Kai (UX Design & Visual Art)
+# Activate any team member (run `claude-team list` for every name)
+claude-team use river      # River (Product Manager)
+claude-team use akira      # Akira (Backend Engineering)
+claude-team use piper      # Piper (Tabletop Playtester)
 
 # Check who's active + coordinator state
 claude-team status
@@ -437,17 +419,30 @@ claude-team branch guard install                  # block accidental commits on 
 
 After activating a team member with `claude-team use`, **start a new Claude Code session** to apply the profile. To switch mid-session without restarting, use the slash commands (`/river`, `/akira`, etc.) directly in Claude Code.
 
-**Companion skill commands** (available after installing the companion skills above):
+**Slash commands that ship with this repo** (installed by `install.sh`, no companion skills required):
 
 ```bash
-/parallel   # generate a parallel session plan with persona + task + file scope
+/river /akira /sasha ...   # switch this session to any of the seventeen specialists
+/team                      # show the roster and who is currently active
+/parallel                  # generate a parallel session plan with persona + task + file scope
+/branch                    # show active branch status; propose a branch name if none is registered
+/session                   # show worktree session status
+/prod-mode  /casual-mode   # switch coordinator mode mid-session
+```
+
+**Companion skill commands** (available only after installing the companion skills above):
+
+```bash
 /conductor  # track and coordinate parallel Claude Code sessions
 /devlog     # log a decision, milestone, or insight to DEVLOG.md
 /roadmap    # update or read the project ROADMAP.md
 /plans      # archive or retrieve finalized implementation plans
 /todo       # manage per-project task checklist
-/branch     # show active branch status; propose a branch name if none is registered
+/publish    # publish markdown to a blogging platform
+/illustrate # generate brand assets with a render-and-inspect loop
 ```
+
+`/devlog` and `/roadmap` ship here as thin wrappers, but they still need their companion skill installed to do anything.
 
 ---
 
@@ -534,55 +529,34 @@ A profile needs a `## Greeting` section, holding the one line the persona says w
 ```
 claude-team-cli/
 ├── README.md
+├── TEAM.md                   # full profiles for all seventeen
+├── WRITING.md                # plain technical English standard
+├── CONTRIBUTING.md
+├── ROADMAP.md
 ├── DEVLOG.md
 ├── install.sh
 ├── bin/
-│   └── claude-team        # CLI script
-├── profiles/
-│   ├── river.md           # Product Manager
-│   ├── akira.md           # Backend specialist
-│   ├── sasha.md           # Frontend specialist
-│   ├── jordan.md          # Data & ML specialist
-│   ├── casey.md           # Data Analyst & Visualization
-│   ├── morgan.md          # Security Engineering
-│   ├── alex.md            # DevOps & Platform
-│   ├── robin.md           # QA & Testing specialist
-│   ├── toni.md            # Product Marketing Manager
-│   ├── quinn.md           # Project Manager & Scrum Master
-│   ├── sage.md            # Business Advisor
-│   ├── kai.md             # UX Design & Visual Art
-│   ├── iris.md            # Brand & Illustration
-│   ├── reiner.md          # Tabletop Game Designer
-│   ├── cornelius.md       # Military Historian
-│   ├── ernie.md           # WW2 Narrative Author
-│   ├── piper.md           # Tabletop Playtester
-│   └── coordinator.md     # Proactive check-in behavior layer
-├── commands/
-│   ├── river.md           # /river slash command
-│   ├── akira.md           # /akira slash command
-│   ├── sasha.md           # /sasha slash command
-│   ├── jordan.md          # /jordan slash command
-│   ├── casey.md           # /casey slash command
-│   ├── morgan.md          # /morgan slash command
-│   ├── alex.md            # /alex slash command
-│   ├── robin.md           # /robin slash command
-│   ├── toni.md            # /toni slash command
-│   ├── quinn.md           # /quinn slash command
-│   ├── sage.md            # /sage slash command
-│   ├── kai.md             # /kai slash command
-│   ├── iris.md            # /iris slash command
-│   ├── reiner.md          # /reiner slash command
-│   ├── cornelius.md       # /cornelius slash command
-│   ├── ernie.md           # /ernie slash command
-│   ├── piper.md           # /piper slash command
-│   ├── team.md            # /team slash command
-│   ├── parallel.md        # /parallel slash command
-│   ├── devlog.md          # /devlog skill invocation
-│   └── roadmap.md         # /roadmap skill invocation
+│   ├── claude-team           # CLI script
+│   └── team-session-start    # SessionStart hook entry point
+├── profiles/                 # the only source of truth for every persona
+│   ├── <name>.md             # one per specialist, seventeen in total
+│   ├── coordinator.md        # casual-mode check-in behavior layer
+│   ├── coordinator-prod.md   # prod-mode layer: branch enforcement, MR/PR flow
+│   └── tiers.conf            # persona to model tier mapping
+├── commands/                 # generated: 17 persona commands + 10 workflow commands
+├── agents/                   # generated: 17 delegation subagents
+├── scripts/
+│   └── generate-agents.sh    # regenerates commands/ and agents/ from profiles/
+├── hooks/
+│   └── hooks.json            # hook registration for the plugin install path
+├── .claude-plugin/
+│   └── plugin.json           # plugin manifest
 ├── tests/
-│   └── run.sh             # Test suite (bash tests/run.sh)
+│   └── run.sh                # test suite (bash tests/run.sh)
+├── docs/
+│   └── proposals/            # design proposals
 └── examples/
-    └── CLAUDE.md.example  # Reference for an activated profile
+    └── CLAUDE.md.example     # reference for an activated profile
 ```
 
 ---
@@ -615,7 +589,7 @@ The `0.4` through `0.7` numbers used during development are retired. v1 is the f
 - `claude-team sync` propagates a profile edit to all three installed copies
 - `claude-team install-hook` registers session context on the clone install path
 - Plain technical English standard for the six coding specialists ([WRITING.md](WRITING.md))
-- 223-test suite covering the CLI commands, both coordinator modes, and the install path
+- Automated test coverage across the CLI commands, both coordinator modes, and the install path, run on Linux and macOS in CI
 
 ### v1.0
 

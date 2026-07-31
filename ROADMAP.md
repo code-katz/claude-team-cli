@@ -24,7 +24,7 @@ v1 delivered the roster and the coordinator. v2 closes the gaps that made the te
 - [x] Slash commands generated from profiles, so a new persona means writing one file instead of three
 - [x] Session handoff briefing: every persona defines a Handoff Brief, the coordinator asks for one at a switch, and it now reaches all four delivery surfaces including the `/name` slash commands
 - [x] Parallel session prompts carry a Context field, so a session starts from what was already decided instead of re-deriving it
-- [x] 223-test suite covering the CLI commands, both coordinator modes, and the install path
+- [x] Automated test coverage across the CLI commands, both coordinator modes, and the install path, run on Linux and macOS in CI
 
 ### Shipped — v1.0
 
