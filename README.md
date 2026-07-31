@@ -14,98 +14,6 @@
 
 ---
 
-## The Team at a Glance
-
-| Name | Role | Ask them about |
-|---|---|---|
-| River | Product Manager | Requirements, discovery, roadmaps, prioritization |
-| Akira | Backend Engineering | APIs, databases, auth, system architecture |
-| Sasha | Frontend Engineering | UI components, accessibility, web performance |
-| Jordan | Data & ML | Pipelines, ML ops, data warehousing, model governance |
-| Casey | Data Analyst | Dashboards, KPIs, BI architecture, data storytelling |
-| Morgan | Security Engineering | Threat modeling, compliance, IAM, penetration testing |
-| Alex | DevOps & Platform | CI/CD, Kubernetes, infrastructure, SRE |
-| Robin | QA & Testing | Test strategy, coverage, CI quality gates, security testing |
-| Toni | Product Marketing | Positioning, messaging, GTM, competitive intel |
-| Quinn | Project Manager & Scrum Master | Sprint planning, delivery tracking, backlog, release coordination |
-| Sage | Business Advisor | Business formation, financial ops, legal awareness, fundraising |
-| Kai | UX Design & Visual Art | Wireframes, mockups, visual design, layout, design systems |
-| Iris | Brand & Illustration | Logos, icon sets, illustration, marketing graphics, asset licensing |
-
-Full profiles for all seventeen are in [TEAM.md](TEAM.md).
-
-### The Game Development Team
-
-A four-person studio for card and board game projects, and a working demonstration that the persona framework is not just for software. Built from the same profile structure and the same generator as the rest of the team, the four hold their lanes and hand off by name: Reiner designs the systems, Cornelius verifies the history, Ernie writes the words, and Piper tries to break it all.
-
-| Name | Role | Ask them about |
-|---|---|---|
-| Reiner | Tabletop Game Designer | Mechanics, decision-space, balance intent, scenario and encounter design |
-| Cornelius | Military Historian | WW2 order of battle, weapons, tactics, chronology, operational significance |
-| Ernie | WW2 Narrative Author | Flavor text, mission briefings, card copy, historical prose |
-| Piper | Tabletop Playtester | Session reports, dominant lines, balance swings, first-play confusion |
-
----
-
-**What's New in v2.0**
-
-v1 gave you the team. v2 makes the team dependable: every session gets its own persona, every edit reaches every copy, and every install path ends up with the same working setup.
-
-**One persona edit, every copy updated** — `claude-team sync` regenerates the delegation subagents and reinstalls all three installed persona files in one step. Before this, editing a profile updated one of three copies and left the rest stale with no warning, so `/akira` and `claude-team use akira` could quietly disagree about who Akira is.
-
-**Session context on every install path** — the SessionStart hook now registers when you install from a clone, not only through the plugin system. If the clone moves, `claude-team install-hook` re-points it.
-
-**Plain technical English from the coding six** — Akira, Sasha, Robin, Alex, Morgan, and Jordan write to a fourteen-rule standard adapted from the plain-language principles of ASD-STE100. Named actors, one instruction per sentence, no filler, and no loss of precision. See [WRITING.md](WRITING.md).
-
-**Session-scoped personas** — the `/akira`-style commands no longer touch global state, so parallel sessions each keep their own persona with no cross-talk. `claude-team use` still exists for pinning a global default and now says so out loud.
-
-**`claude-team launch <persona>`** — open a dedicated Claude Code session with the persona baked in as system prompt, on its tier model (Fable 5 for the deep-reasoning personas, Opus 4.8 for consulting and craft, Sonnet 5 for implementation), optionally inside an isolated worktree: `claude-team launch akira --task "design the battles API" --worktree session/1-akira-battles`.
-
-**Delegation subagents** — seventeen generated agents let any session hand work to a persona ("have Robin review this diff") without switching. Regenerate from profiles with `claude-team sync`.
-
-**Plugin packaging** — install everything (commands, agents, hooks, CLI on PATH) via the plugin system; `install.sh` remains for manual setups.
-
-**Worktree-isolated `/parallel`** — session plans create a git worktree per session and never switch branches; the coordination session merges in dependency order.
-
----
-
-## Installation
-
-### Quick install
-
-```bash
-git clone https://github.com/code-katz/claude-team-cli.git
-cd claude-team-cli
-bash install.sh
-```
-
-This installs:
-- Team member profiles to `~/.claude/team/`
-- Slash commands to `~/.claude/commands/`
-- Delegation subagents to `~/.claude/agents/`
-- A `SessionStart` hook in `~/.claude/settings.json`, which injects worktree and branch context at the start of every session
-- The `claude-team` CLI to `~/.local/bin/` (symlinked, so repo updates apply immediately)
-
-Keep the clone. The CLI is a symlink into it and the hook points at it by absolute path, so moving or deleting the clone breaks both. Re-run `bash install.sh` after moving it, or just `claude-team install-hook` to re-point the hook.
-
-Make sure `~/.local/bin` is on your `PATH`:
-
-```bash
-# Add to ~/.zshrc or ~/.bashrc
-export PATH="$HOME/.local/bin:$PATH"
-```
-
----
-
-
-## Who This Is For
-
-Solo developers and small teams doing work that spans multiple domains, without a roomful of specialists to pull into a conversation.
-
-If you're the only engineer on a project, or one of a small team where everyone wears multiple hats, `claude-team-cli` gives you access to expert-level thinking in domains outside your primary strength. Not generic AI help. A named specialist who thinks the way that domain actually thinks, asks the questions a senior practitioner would ask, and pushes back when something's off.
-
----
-
 ## The Idea
 
 You know that feeling when you're deep in a coding session and you wish you had a senior engineer looking over your shoulder? Someone who actually knows this domain cold and will tell you straight when something's off?
@@ -162,7 +70,76 @@ Generic Claude gives you a checklist. Robin reframes the problem, identifies the
 
 ---
 
-### The Coordinator
+## Who This Is For
+
+Solo developers and small teams doing work that spans multiple domains, without a roomful of specialists to pull into a conversation.
+
+If you're the only engineer on a project, or one of a small team where everyone wears multiple hats, `claude-team-cli` gives you access to expert-level thinking in domains outside your primary strength. Not generic AI help. A named specialist who thinks the way that domain actually thinks, asks the questions a senior practitioner would ask, and pushes back when something's off.
+
+---
+
+## The Team at a Glance
+
+| Name | Role | Ask them about |
+|---|---|---|
+| River | Product Manager | Requirements, discovery, roadmaps, prioritization |
+| Akira | Backend Engineering | APIs, databases, auth, system architecture |
+| Sasha | Frontend Engineering | UI components, accessibility, web performance |
+| Jordan | Data & ML | Pipelines, ML ops, data warehousing, model governance |
+| Casey | Data Analyst | Dashboards, KPIs, BI architecture, data storytelling |
+| Morgan | Security Engineering | Threat modeling, compliance, IAM, penetration testing |
+| Alex | DevOps & Platform | CI/CD, Kubernetes, infrastructure, SRE |
+| Robin | QA & Testing | Test strategy, coverage, CI quality gates, security testing |
+| Toni | Product Marketing | Positioning, messaging, GTM, competitive intel |
+| Quinn | Project Manager & Scrum Master | Sprint planning, delivery tracking, backlog, release coordination |
+| Sage | Business Advisor | Business formation, financial ops, legal awareness, fundraising |
+| Kai | UX Design & Visual Art | Wireframes, mockups, visual design, layout, design systems |
+| Iris | Brand & Illustration | Logos, icon sets, illustration, marketing graphics, asset licensing |
+
+Full profiles for all seventeen are in [TEAM.md](TEAM.md).
+
+### The Game Development Team
+
+A four-person studio for card and board game projects, and a working demonstration that the persona framework is not just for software. Built from the same profile structure and the same generator as the rest of the team, the four hold their lanes and hand off by name: Reiner designs the systems, Cornelius verifies the history, Ernie writes the words, and Piper tries to break it all.
+
+| Name | Role | Ask them about |
+|---|---|---|
+| Reiner | Tabletop Game Designer | Mechanics, decision-space, balance intent, scenario and encounter design |
+| Cornelius | Military Historian | WW2 order of battle, weapons, tactics, chronology, operational significance |
+| Ernie | WW2 Narrative Author | Flavor text, mission briefings, card copy, historical prose |
+| Piper | Tabletop Playtester | Session reports, dominant lines, balance swings, first-play confusion |
+
+---
+
+## Installation
+
+### Quick install
+
+```bash
+git clone https://github.com/code-katz/claude-team-cli.git
+cd claude-team-cli
+bash install.sh
+```
+
+This installs:
+- Team member profiles to `~/.claude/team/`
+- Slash commands to `~/.claude/commands/`
+- Delegation subagents to `~/.claude/agents/`
+- A `SessionStart` hook in `~/.claude/settings.json`, which injects worktree and branch context at the start of every session
+- The `claude-team` CLI to `~/.local/bin/` (symlinked, so repo updates apply immediately)
+
+Keep the clone. The CLI is a symlink into it and the hook points at it by absolute path, so moving or deleting the clone breaks both. Re-run `bash install.sh` after moving it, or just `claude-team install-hook` to re-point the hook.
+
+Make sure `~/.local/bin` is on your `PATH`:
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+---
+
+## The Coordinator
 
 Turn on the coordinator and Claude will ask you who should be on each task before diving in, and tap you on the shoulder when the work drifts into a different domain. It's like having a project manager who routes work to the right person automatically.
 
@@ -548,7 +525,7 @@ claude-team-cli/
 ├── scripts/
 │   └── generate-agents.sh    # regenerates commands/ and agents/ from profiles/
 ├── hooks/
-│   └── hooks.json            # hook registration for the plugin install path
+│   └── hooks.json            # hook registration, plugin-system layout
 ├── .claude-plugin/
 │   └── plugin.json           # plugin manifest
 ├── tests/
@@ -579,17 +556,27 @@ The `0.4` through `0.7` numbers used during development are retired. v1 is the f
 
 ### v2.0 (current)
 
-**A team you can rely on across sessions, installs, and edits**
+**A team you can rely on across sessions and edits**
 
-- Session-scoped personas: parallel sessions each keep their own specialist, with no cross-talk
-- `claude-team launch <persona>` opens a dedicated session with the persona as system prompt, on its tier model
-- Seventeen delegation subagents, so any session can hand work to a specialist without switching
-- Plugin packaging: commands, agents, hooks, and the CLI installed in one step
-- Worktree-isolated `/parallel`, so session plans never switch branches in a shared checkout
-- `claude-team sync` propagates a profile edit to all three installed copies
-- `claude-team install-hook` registers session context on the clone install path
-- Plain technical English standard for the six coding specialists ([WRITING.md](WRITING.md))
-- Automated test coverage across the CLI commands, both coordinator modes, and the install path, run on Linux and macOS in CI
+v1 gave you the team. v2 makes the team dependable: every session gets its own persona, and every profile edit reaches every installed copy.
+
+**Session-scoped personas** — the `/akira`-style commands no longer touch global state, so parallel sessions each keep their own persona with no cross-talk. `claude-team use` still exists for pinning a global default and now says so out loud.
+
+**One persona edit, every copy updated** — `claude-team sync` regenerates the delegation subagents and reinstalls all three installed persona files in one step. Before this, editing a profile updated one of three copies and left the rest stale with no warning, so `/akira` and `claude-team use akira` could quietly disagree about who Akira is.
+
+**`claude-team launch <persona>`** — open a dedicated Claude Code session with the persona baked in as system prompt, on its tier model (Fable 5 for the deep-reasoning personas, Opus 4.8 for consulting and craft, Sonnet 5 for implementation), optionally inside an isolated worktree: `claude-team launch akira --task "design the battles API" --worktree session/1-akira-battles`.
+
+**Delegation subagents** — seventeen generated agents let any session hand work to a persona ("have Robin review this diff") without switching. Regenerate from profiles with `claude-team sync`.
+
+**Worktree-isolated `/parallel`** — session plans create a git worktree per session and never switch branches; the coordination session merges in dependency order.
+
+**Session context on install** — `install.sh` registers the SessionStart hook, which injects worktree and branch context at the start of every session. If the clone moves, `claude-team install-hook` re-points it.
+
+**Plain technical English from the coding six** — Akira, Sasha, Robin, Alex, Morgan, and Jordan write to a fourteen-rule standard adapted from the plain-language principles of ASD-STE100. Named actors, one instruction per sentence, no filler, and no loss of precision. See [WRITING.md](WRITING.md).
+
+**Tested on Linux and macOS** — shellcheck plus the full suite run in CI on every push and pull request, covering the CLI commands, both coordinator modes, and the install path.
+
+**Plugin-shaped layout** — `commands/`, `agents/`, and `hooks/hooks.json` sit at the paths Claude Code's plugin system expects, and `.claude-plugin/plugin.json` describes the package. The repo is not published to a marketplace yet, so `bash install.sh` remains the install path. See [Installation](#installation).
 
 ### v1.0
 
