@@ -1,3 +1,8 @@
+---
+description: Show the active branch status for this project, and propose a branch name if none is registered
+disable-model-invocation: true
+---
+
 Run this command and report the output to the user: `claude-team branch status`
 
 Then:

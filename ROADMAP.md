@@ -1,7 +1,7 @@
 # Roadmap — claude-team-cli
 
 > Living product roadmap. Current priorities and forward bets.
-> Updated by Claude using the [roadmap skill](https://github.com/d6veteran/claude-roadmap-skill).
+> Updated by Claude using the [roadmap skill](https://github.com/code-katz/claude-roadmap-skill).
 
 ---
 
@@ -11,15 +11,15 @@
 
 **A team you can rely on across sessions, installs, and edits**
 
-v1 delivered the roster and the coordinator. v2 closes the gaps that made the team unreliable in daily use: personas leaking between parallel sessions, a profile edit reaching one installed copy out of three, and session context missing entirely for anyone who installed from a clone instead of the plugin system.
+v1 delivered the roster and the coordinator. v2 closes the gaps that made the team unreliable in daily use: personas leaking between parallel sessions, a profile edit reaching one installed copy out of three, and session context missing entirely because the SessionStart hook registered only through `hooks/hooks.json`, which needs a plugin runtime that the `install.sh` path never provides.
 
 - [x] Session-scoped personas: the `/name` commands no longer write global state, so parallel sessions never overwrite each other
 - [x] `claude-team launch <persona>` — a dedicated session with the persona as system prompt, on its tier model, optionally in an isolated worktree
 - [x] Seventeen delegation subagents generated from `profiles/`, so any session can hand work to a specialist without switching
-- [x] Plugin packaging: commands, agents, hooks, and the CLI installed in one step
+- [x] Plugin-shaped layout: `commands/`, `agents/`, and `hooks/hooks.json` sit at the paths Claude Code's plugin system expects, and `.claude-plugin/plugin.json` describes the package. The repo is not published to a marketplace yet, so `bash install.sh` remains the install path
 - [x] Worktree-isolated `/parallel`: session plans create a worktree per session and never switch branches in a shared checkout
 - [x] `claude-team sync` — one command propagates a profile edit to all three installed copies
-- [x] `claude-team install-hook` — the SessionStart hook now registers on the `install.sh` path, not only the plugin path
+- [x] `claude-team install-hook` — the SessionStart hook registers by absolute path in `settings.json`, so it works on the `install.sh` path instead of only through the plugin manifest
 - [x] Plain technical English standard for the six coding specialists, documented in [WRITING.md](WRITING.md)
 - [x] Slash commands generated from profiles, so a new persona means writing one file instead of three
 - [x] Session handoff briefing: every persona defines a Handoff Brief, the coordinator asks for one at a switch, and it now reaches all four delivery surfaces including the `/name` slash commands
@@ -66,3 +66,4 @@ That is an invitation, not a finish line. If something about the team gets in yo
 | 2026-07-29 | snapshot | Renumbered to v2.0 current, v1.0 shipped; pre-release `0.x` numbers retired. Corrected test count to 135. Local profile overrides promoted to top priority. |
 | 2026-07-29 | decision | Local profile overrides and team-scoped profiles retired. Both create a second source of persona truth competing with the repo. Supported paths are a pull request or a fork, documented in CONTRIBUTING.md. |
 | 2026-07-29 | correction | Session handoff briefing moved from aspirational to shipped. It was built with the personas and the entry was stale; the real defect was that the brief never reached the `/name` slash commands. Parallel session prompts gained a Context field. Aspirational list is now empty. |
+| 2026-07-31 | correction | "Plugin packaging: installed in one step" was false and always was. There is no `marketplace.json`, and a plugin-only install never runs `claude-team sync`, so the CLI dies in `require_profiles_dir`. Restated as plugin-shaped layout, matching the wording in README. The same claim was corrected in README on 2026-07-31 but missed here, so the two now share one wording and a CI check asserts no doc claims a marketplace install path while `marketplace.json` is absent. |

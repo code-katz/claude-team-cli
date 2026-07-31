@@ -27,6 +27,8 @@ Two files are generated from it and must never be edited by hand:
 
 `scripts/generate-agents.sh` writes both. `claude-team sync` runs the generator and then installs all three copies. The test suite fails if either generated file drifts from its profile, so a profile edit without a regeneration will not pass CI.
 
+`TEAM.md` is the exception. It carries a hand-written summary of every persona, is not produced by the generator, and no regeneration updates it. Adding, renaming, or removing a persona means editing it by hand in the same commit. The test suite checks that its persona count matches `profiles/`, which catches an addition or removal but not a stale description.
+
 ## Adding or changing a persona
 
 1. Edit `profiles/<name>.md`, or copy an existing profile as a starting point.
@@ -42,7 +44,11 @@ bash tests/run.sh
 
 6. Commit the regenerated `agents/` and `commands/` files alongside the profile. They are committed artifacts, not build output.
 
-7. **Search for stale rosters.** Adding or removing a persona changes how many there are and what they're named, and no test catches a doc that still says the old number. Grep the repo for the persona's name and for the old count, numeral and spelled out, and fix every doc that lists personas individually or states the total. Where you can, point the doc at `claude-team list` instead of hand-listing the roster again: a command that reads the roster live cannot drift, and a copy always can.
+7. **Update `TEAM.md` by hand.** It is not generated. Add, edit, or remove the persona's section to match the profile.
+
+8. **Search for stale rosters.** Adding or removing a persona changes how many there are and what they're named. Grep the repo for the persona's name and for the old count, numeral and spelled out, and fix every doc that lists personas individually or states the total. Where you can, point the doc at `claude-team list` instead of hand-listing the roster again: a command that reads the roster live cannot drift, and a copy always can.
+
+**Fix the claim, not the file.** A statement that is wrong in one doc is usually wrong in every doc that repeats it. Grep for the claim across the whole repo before you consider it fixed. This is not hypothetical: a false "installs as a plugin in one step" claim was corrected in `README.md` and left standing in `ROADMAP.md` for weeks, because the fix was scoped to the file where someone noticed it rather than to the claim itself.
 
 Coordinator profiles (`profiles/coordinator.md`, `profiles/coordinator-prod.md`) are exempt. The generator skips them, and they need no `## Greeting`.
 

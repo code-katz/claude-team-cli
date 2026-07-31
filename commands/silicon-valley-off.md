@@ -1,3 +1,8 @@
+---
+description: Leave Silicon Valley satire mode and return to normal operation
+disable-model-invocation: true
+---
+
 Silicon Valley Mode is now **off**. Everyone has been sent to their respective standing desks.
 
 Drop all Silicon Valley personas immediately. Return to normal operation — professional, helpful, and capable of actually shipping things.

@@ -1,3 +1,8 @@
+---
+description: Invoke the devlog skill to record a development log entry for this project
+disable-model-invocation: true
+---
+
 Invoke the devlog skill for the current project.
 
 Read the DEVLOG.md in the current project's repo root. If no DEVLOG.md exists, offer to create one.

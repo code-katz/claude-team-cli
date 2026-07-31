@@ -137,6 +137,10 @@ Make sure `~/.local/bin` is on your `PATH`:
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
+### First run
+
+Open Claude Code and type `/river` to switch the session to the Product Manager, or any other name from the roster. Outside a session, `claude-team list` shows every specialist and `claude-team status` shows who is active.
+
 ---
 
 ## The Coordinator
@@ -385,6 +389,20 @@ claude-team sync
 # Install slash commands (if you skipped install.sh or need to re-install)
 claude-team install-commands
 
+# Open a dedicated session with a persona baked in, on their tier model
+claude-team launch akira                          # new session as Akira
+claude-team launch akira --task "..."             # start with an initial prompt
+claude-team launch akira --worktree feat/api      # launch inside an isolated worktree
+claude-team launch akira --model claude-sonnet-5  # override the persona's tier default
+claude-team launch akira --dry-run                # print the launch command, don't run it
+
+# Worktree sessions — an isolated git worktree per work stream, so parallel
+# sessions never switch branches underneath each other in a shared checkout
+claude-team session start feat/my-feature         # create the worktree and register it
+claude-team session status                        # show this session's worktree and branch
+claude-team session list                          # show every registered session
+claude-team session done                          # finish and clean up the worktree
+
 # Branch hygiene — see the Branch Hygiene section for the full workflow
 claude-team branch start feat/my-feature          # register before writing any code
 claude-team branch done                           # mark merged
@@ -405,6 +423,7 @@ After activating a team member with `claude-team use`, **start a new Claude Code
 /branch                    # show active branch status; propose a branch name if none is registered
 /session                   # show worktree session status
 /prod-mode  /casual-mode   # switch coordinator mode mid-session
+/silicon-valley            # satire mode; /silicon-valley-off to leave
 ```
 
 **Companion skill commands** (available only after installing the companion skills above):
@@ -543,6 +562,8 @@ claude-team-cli/
 - macOS or Linux
 - Bash 4+ (macOS ships Bash 3.2 at `/bin/bash`; install a current Bash with `brew install bash`)
 - [Claude Code](https://claude.ai/code)
+- `git` — the install path starts with `git clone`, and `branch` and `session` shell out to it
+- `python3` — required only to register the `SessionStart` hook automatically. Without it, `claude-team install-hook` prints the manual `settings.json` edit instead of failing
 
 ---
 

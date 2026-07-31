@@ -1,3 +1,8 @@
+---
+description: Switch the coordinator to casual mode, with no branch enforcement
+disable-model-invocation: true
+---
+
 Run this bash command to enable casual coordinator mode: `claude-team coordinator on`
 
 Casual mode is now active. Branch enforcement is off — commit directly to main as you normally would.

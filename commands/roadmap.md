@@ -1,3 +1,8 @@
+---
+description: Invoke the roadmap skill to update the product roadmap for this project
+disable-model-invocation: true
+---
+
 Invoke the roadmap skill for the current project.
 
 Read the ROADMAP.md in the current project's repo root. If no ROADMAP.md exists, offer to create one using the roadmap skill template.

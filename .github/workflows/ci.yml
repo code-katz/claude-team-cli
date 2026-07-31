@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    # Mondays 09:00 UTC. Catches an external link that went stale between
+    # pushes; see the link-check job below for why this cannot run on every
+    # push or pull_request instead.
+    - cron: "0 9 * * 1"
 
 jobs:
   lint:
@@ -12,7 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: shellcheck (uses repo .shellcheckrc)
-        run: shellcheck bin/claude-team bin/team-session-start install.sh scripts/generate-agents.sh tests/run.sh
+        run: shellcheck bin/claude-team bin/team-session-start install.sh scripts/generate-agents.sh tests/run.sh tests/check-links.sh
+      - name: claude plugin validate (best effort; this runner may not have the CLI)
+        run: |
+          if command -v claude >/dev/null 2>&1; then
+            claude plugin validate . --strict
+          else
+            echo "skipped: 'claude' CLI is not available on this runner"
+          fi
 
   test-linux:
     name: tests (linux)
@@ -33,3 +46,17 @@ jobs:
         run: |
           bash --version | head -1
           bash tests/run.sh
+
+  link-check:
+    name: external links (network-dependent, not merge-blocking)
+    runs-on: ubuntu-latest
+    # Opt-in, not run on every push or pull_request: a stale GitHub org/repo
+    # link is real drift (see tests/check-links.sh for the incident that
+    # motivated this), but a transient DNS failure or rate limit on a
+    # contributor's unrelated PR is not something this repo should block
+    # merges on. Runs on demand and on the weekly schedule above instead.
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check external links
+        run: bash tests/check-links.sh

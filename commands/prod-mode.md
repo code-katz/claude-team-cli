@@ -1,3 +1,8 @@
+---
+description: Switch the coordinator to production mode, with branch enforcement on
+disable-model-invocation: true
+---
+
 Run this bash command to enable production coordinator mode: `claude-team coordinator prod`
 
 Production mode is now active. Branch enforcement is on.

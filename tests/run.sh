@@ -1549,6 +1549,307 @@ rm -rf "$INSTALL_HOME" "$INSTALL_REPO"
 
 echo ""
 
+# ─── Documentation drift ──────────────────────────────────────────────────────
+#
+# Five sessions in a row ran an open-ended "review the docs for drift" prompt
+# and returned five different lists of findings. A review is a generator, not
+# a check, and an unbounded generator does not converge. Every assertion below
+# derives both sides from the filesystem or the source and compares them, so a
+# passing suite is the answer to "what is the state of this repo" instead of
+# one more guess at it. A check that hardcodes today's count or file list
+# would only move the drift from the docs into the test, so none of the checks
+# below do that; each was verified against this repo's actual history (a real
+# commit that fixed a real drift) before being written, not against invented
+# examples.
+
+echo "commands/ <-> README shipped-commands"
+
+# Every persona command (profiles/<name>.md, generated into
+# commands/<name>.md) is represented collectively in README, as the pattern
+# "/river /akira /sasha ..." plus the TEAM.md pointer and the roster table,
+# not one line per persona. That collective form is a documented choice, not
+# drift, so persona commands are excluded here; the roster itself is covered
+# by the "help lists every persona" and "install-commands lists every
+# persona" checks earlier in this file. The 10 "workflow" commands (every
+# other file in commands/) have no collective stand-in: each one is named
+# individually or it is invisible. /silicon-valley shipped as a command file
+# and was not named anywhere in README until this check was written.
+missing_from_readme=""
+workflow_cmd_count=0
+for f in "$REPO_DIR"/commands/*.md; do
+  name=$(basename "$f" .md)
+  [[ -f "$PROFILES_DIR/$name.md" ]] && continue
+  workflow_cmd_count=$((workflow_cmd_count + 1))
+  grep -qE "/${name}([^a-zA-Z0-9_-]|\$)" "$REPO_DIR/README.md" \
+    || missing_from_readme="$missing_from_readme /$name"
+done
+# Guards the guard: if every command file ever turned out to be a persona
+# command, the loop above would report a vacuous pass having checked nothing.
+if [[ "$workflow_cmd_count" -gt 0 ]]; then ok "found workflow commands to check, so this test is not vacuous"
+else fail "found workflow commands to check, so this test is not vacuous (found none)"; fi
+if [[ -z "$missing_from_readme" ]]; then ok "every workflow command in commands/ is named in README"
+else fail "every workflow command in commands/ is named in README (missing:$missing_from_readme)"; fi
+
+# Reverse direction: README's "ships with this repo, no companion skill
+# required" block is a specific structural claim about what commands/
+# contains. If it names a command there, that command must be a real file, or
+# the doc is advertising something the repo does not ship (a live-vs-companion
+# command like /devlog or /roadmap is deliberately listed under "Companion
+# skill commands" instead, so this block only ever names commands that should
+# resolve to a file with no further caveat).
+readme_ships_block=$(awk '
+  /Slash commands that ship with this repo/ { seen = 1 }
+  seen && /^```bash$/ {
+    fence++
+    if (fence == 1) { getline; while ($0 !~ /^```$/) { print; getline } }
+    exit
+  }
+' "$REPO_DIR/README.md")
+if [[ -n "$readme_ships_block" ]]; then ok "found the 'ships with this repo' block, so this test is not vacuous"
+else fail "found the 'ships with this repo' block, so this test is not vacuous (heading text may have changed)"; fi
+claimed_missing_file=""
+while IFS= read -r tok; do
+  [[ -n "$tok" ]] || continue
+  cname="${tok#/}"
+  [[ -f "$REPO_DIR/commands/$cname.md" ]] || claimed_missing_file="$claimed_missing_file $tok"
+done < <(grep -oE '/[a-z][a-z-]*' <<< "$readme_ships_block" | sort -u)
+if [[ -z "$claimed_missing_file" ]]; then ok "every command README claims ships with this repo has a real file"
+else fail "every command README claims ships with this repo has a real file (no file for:$claimed_missing_file)"; fi
+echo ""
+
+echo "bin/claude-team dispatch <-> README Usage"
+
+# claude-team session and claude-team launch shipped as real top-level
+# commands and were absent from README entirely (not merely from one
+# section), so the check searches the whole file rather than a single
+# heading-bounded block: claude-team install-hook is genuine prior art for a
+# command documented only in prose (Installation, Requirements, Roadmap), not
+# inside the Usage code fence, and that placement is legitimate, not drift.
+dispatch_missing=""
+dispatch_cmd_count=0
+while IFS= read -r cmd; do
+  case "$cmd" in *'|'*|'*') continue ;; esac
+  [[ "$cmd" == "help" ]] && continue
+  dispatch_cmd_count=$((dispatch_cmd_count + 1))
+  grep -qE "claude-team ${cmd}([^a-zA-Z0-9_-]|\$)" "$REPO_DIR/README.md" \
+    || dispatch_missing="$dispatch_missing $cmd"
+done < <(awk '/^case "\$\{1:-help\}" in$/{f=1;next} /^esac$/{f=0} f{print $1}' "$CLI" | sed 's/)$//')
+if [[ "$dispatch_cmd_count" -ge 10 ]]; then ok "found the top-level dispatch table, so this test is not vacuous"
+else fail "found the top-level dispatch table, so this test is not vacuous (found only $dispatch_cmd_count entries)"; fi
+if [[ -z "$dispatch_missing" ]]; then ok "every top-level 'claude-team <command>' is documented in README"
+else fail "every top-level 'claude-team <command>' is documented in README (missing:$dispatch_missing)"; fi
+
+# 'branch' and 'session' are command families with their own internal
+# dispatch. Checked one level deep, the same way and for the same reason as
+# the top level: a subcommand a user can actually type should appear
+# somewhere in README. Not recursed a further level into 'branch guard
+# <install|remove>' -- the real defect this suite is guarding against was a
+# whole missing top-level family, not a missing third-level action, and
+# following the dispatch tree all the way down starts pinning README to the
+# CLI's exact argument grammar rather than to its documented surface.
+for fam in branch session; do
+  fam_missing=""
+  fam_sub_count=0
+  while IFS= read -r sub; do
+    case "$sub" in *'|'*|'*') continue ;; esac
+    fam_sub_count=$((fam_sub_count + 1))
+    grep -qE "claude-team ${fam} ${sub}([^a-zA-Z0-9_-]|\$)" "$REPO_DIR/README.md" \
+      || fam_missing="$fam_missing $sub"
+  done < <(awk -v fn="cmd_$fam() {" '
+    $0 == fn { infn = 1 }
+    infn { print }
+    infn && /^}$/ { exit }
+  ' "$CLI" | awk '/case "\$subcmd" in/{f=1;next} /esac/{f=0} f{print $1}' | sed 's/)$//')
+  if [[ "$fam_sub_count" -ge 3 ]]; then ok "found $fam's subcommand dispatch, so this test is not vacuous"
+  else fail "found $fam's subcommand dispatch, so this test is not vacuous (found only $fam_sub_count entries)"; fi
+  if [[ -z "$fam_missing" ]]; then ok "every 'claude-team $fam <subcommand>' is documented in README"
+  else fail "every 'claude-team $fam <subcommand>' is documented in README (missing:$fam_missing)"; fi
+done
+echo ""
+
+echo "commands/ YAML frontmatter"
+
+# claude plugin validate --strict rejects a command file with no frontmatter,
+# and a missing frontmatter block is otherwise invisible: the slash command
+# still works in a live session either way. Nine workflow commands (branch,
+# casual-mode, devlog, prod-mode, roadmap, session, silicon-valley,
+# silicon-valley-off, team) shipped without it. Checked structurally rather
+# than by shelling out to 'claude plugin validate': that keeps this test
+# hermetic on a machine that does not have the Claude Code CLI on PATH, CI
+# included. See the CI workflow for the best-effort 'claude plugin validate'
+# pass that runs in addition to this when that binary is available.
+frontmatter_bad=""
+for f in "$REPO_DIR"/commands/*.md; do
+  cname=$(basename "$f")
+  first_line=$(head -n1 "$f")
+  if [[ "$first_line" != "---" ]]; then
+    frontmatter_bad="$frontmatter_bad $cname(no-opening-marker)"
+    continue
+  fi
+  close_line=$(awk 'NR>1 && /^---$/{print NR; exit}' "$f")
+  if [[ -z "$close_line" ]]; then
+    frontmatter_bad="$frontmatter_bad $cname(no-closing-marker)"
+    continue
+  fi
+  sed -n "2,${close_line}p" "$f" | grep -q '^description:' \
+    || frontmatter_bad="$frontmatter_bad $cname(no-description-key)"
+done
+if [[ -z "$frontmatter_bad" ]]; then ok "every commands/ file has YAML frontmatter with a description"
+else fail "every commands/ file has YAML frontmatter with a description (bad:$frontmatter_bad)"; fi
+echo ""
+
+echo "TEAM.md persona parity with profiles/"
+
+# TEAM.md is a hand-maintained copy: nothing regenerates it from profiles/,
+# unlike agents/ and commands/. CONTRIBUTING.md tells a contributor adding or
+# removing a persona to update it by hand in the same commit; nothing before
+# this enforced that instruction. Compares both the count and the exact name
+# set, because two equal counts do not prove the same seventeen names are
+# present -- a renamed or swapped entry would pass a count-only check.
+team_names=$(grep '^### ' "$REPO_DIR/TEAM.md" | sed -E 's/^### ([A-Za-z]+):.*/\1/' | tr '[:upper:]' '[:lower:]' | sort)
+profile_names=$(for p in "$PROFILES_DIR"/*.md; do
+  n=$(basename "$p" .md)
+  case "$n" in coordinator*) continue ;; esac
+  echo "$n"
+done | sort)
+team_count=$(grep -c . <<< "$team_names")
+profile_count=$(grep -c . <<< "$profile_names")
+if [[ "$team_count" -gt 0 && "$profile_count" -gt 0 ]]; then ok "found persona sections on both sides, so this test is not vacuous"
+else fail "found persona sections on both sides, so this test is not vacuous (TEAM.md:$team_count profiles/:$profile_count)"; fi
+if [[ "$team_count" == "$profile_count" ]]; then ok "TEAM.md persona section count matches profiles/"
+else fail "TEAM.md persona section count matches profiles/ (TEAM.md has $team_count, profiles/ has $profile_count)"; fi
+team_profile_diff=$(diff <(echo "$team_names") <(echo "$profile_names") || true)
+if [[ -z "$team_profile_diff" ]]; then ok "TEAM.md persona names match profiles/ exactly"
+else fail "TEAM.md persona names match profiles/ exactly (diff:$(tr '\n' ' ' <<< "$team_profile_diff"))"; fi
+echo ""
+
+echo "internal markdown links and file paths resolve"
+
+# TODOS.md pointed a reader at 'publish/posts/image-prompts.md', which does
+# not exist. DEVLOG.md and docs/proposals/ are excluded because both are
+# historical-record documents by design: docs/proposals/image-generation.md
+# says outright that its profiles/kai.md line citations "refer to the
+# pre-change file and are left as written for the historical record," and
+# that publish/style-guide.md was "deliberately deleted... so re-adding a
+# per-repo brand file re-introduces what was removed on purpose." A dangling
+# path in either is not drift; it is the record working as intended, so
+# flagging it would train a maintainer to ignore this check rather than fix
+# what it finds. generated/ persona content (profiles/, commands/, agents/)
+# is excluded because those files are not project documentation, and were
+# already seen to contain unrelated prose that happens to look path-shaped
+# (Sage's "marketplace, freemium, one-time purchase").
+#
+# A backtick span counts as a path candidate only once it looks enough like
+# one to be worth resolving: it must contain a slash (so a bare code term
+# like `marketplace.json`, mentioned deliberately as NOT existing, is never a
+# candidate), and it is stripped of a trailing ':<line>' or ':<line>-<line>'
+# citation first, because 'bin/claude-team:15' is this repo's own convention
+# for citing a source line and is not part of the path.
+doc_files=$(git -C "$REPO_DIR" ls-files '*.md' \
+  | grep -Ev '^(profiles|commands|agents)/' \
+  | grep -v '^DEVLOG\.md$' \
+  | grep -v '^docs/proposals/')
+broken_paths=""
+checked_paths=0
+while IFS= read -r doc; do
+  [[ -n "$doc" ]] || continue
+  doc_full="$REPO_DIR/$doc"
+  doc_dir=$(dirname "$doc_full")
+
+  while IFS= read -r target; do
+    [[ -n "$target" ]] || continue
+    target="${target%%#*}"
+    [[ -n "$target" ]] || continue
+    checked_paths=$((checked_paths + 1))
+    if [[ -e "$doc_dir/$target" || -e "$REPO_DIR/$target" ]]; then
+      :
+    else
+      broken_paths="$broken_paths
+  $doc: markdown link -> $target"
+    fi
+  done < <(grep -oE '\]\(([^()#[:space:]]+)' "$doc_full" | sed -E 's/^\]\(//' | grep -Ev '^(https?:|mailto:)')
+
+  while IFS= read -r target; do
+    [[ -n "$target" ]] || continue
+    target=$(sed -E 's/:[0-9]+(-[0-9]+)?$//' <<< "$target")
+    [[ "$target" == */* ]] || continue
+    case "$target" in
+      *'<'*|*'>'*|'~'*|*'$'*|*' '*|-*) continue ;;
+    esac
+    case "$target" in
+      profiles/*|commands/*|agents/*|bin/*|scripts/*|hooks/*|tests/*|docs/*|examples/*|publish/*|.claude-plugin/*|.github/*) ;;
+      *.md|*.sh|*.json|*.conf|*.yml|*.yaml|*.example) ;;
+      *) continue ;;
+    esac
+    checked_paths=$((checked_paths + 1))
+    if [[ -e "$doc_dir/$target" || -e "$REPO_DIR/$target" ]]; then
+      :
+    else
+      broken_paths="$broken_paths
+  $doc: \`$target\`"
+    fi
+  done < <(grep -oE '`[^`]+`' "$doc_full" | sed -E 's/^`//; s/`$//')
+done <<< "$doc_files"
+if [[ "$checked_paths" -gt 0 ]]; then ok "found $checked_paths path candidates to check, so this test is not vacuous"
+else fail "found path candidates to check, so this test is not vacuous (found none)"; fi
+if [[ -z "$broken_paths" ]]; then ok "every internal link and file-path reference resolves"
+else fail "every internal link and file-path reference resolves (broken:$broken_paths)"; fi
+echo ""
+
+echo "no doc claims an unavailable plugin/marketplace install path"
+
+# The literal historical claim, in the two forms it actually shipped in: '**
+# Plugin packaging** -- install everything (commands, agents, hooks, CLI on
+# PATH) via the plugin system' (README) and 'Plugin packaging: commands,
+# agents, hooks, and the CLI installed in one step' (ROADMAP.md, corrected in
+# README first and left standing here for weeks). Both are false as long as
+# .claude-plugin/marketplace.json does not exist: there is no marketplace
+# entry for '/plugin marketplace add' to read, and even with one, a
+# plugin-only install runs claude-team sync for nobody, so PROFILES_DIR stays
+# empty and require_profiles_dir kills every command. The check is
+# conditional on that file's absence, so it stops applying the day the plugin
+# path is actually built rather than needing to be deleted by hand.
+#
+# Matched only outside double-quoted spans, so a doc that QUOTES the retired
+# claim to document the correction is not flagged: ROADMAP.md's Revision
+# History row and CONTRIBUTING.md's "Fix the claim, not the file" paragraph
+# both do exactly that, quoting the old wording on purpose. Verified against
+# this file's own history: with the quoting removed, both lines DO match the
+# pattern below, which is why stripping quoted spans first, rather than
+# excluding files by name, is the mechanism -- a third file could quote the
+# same retired claim tomorrow and would not need adding to an exclusion list.
+# DEVLOG.md is the one exception excluded by name rather than by quoting,
+# because it is an append-only historical log that narrates the old bug in
+# unquoted prose ("has never been installable") as well as quoted excerpts,
+# and a historical log is not asserting anything about the CURRENT state of
+# the repo in the first place.
+if [[ -e "$REPO_DIR/.claude-plugin/marketplace.json" ]]; then
+  ok "marketplace.json exists, so a marketplace-install claim would be true (check not applicable)"
+else
+  banned_claim='(one[-[:space:]]step).*(plugin|marketplace)|(plugin|marketplace).*(one[-[:space:]]step)|via the plugin system.*install|install[a-zA-Z]*.*via the plugin system|plugin marketplace add|claude plugin install'
+  banned_hits=""
+  banned_files_checked=0
+  while IFS= read -r doc; do
+    [[ -n "$doc" ]] || continue
+    [[ "$doc" == "DEVLOG.md" ]] && continue
+    banned_files_checked=$((banned_files_checked + 1))
+    stripped=$(sed -E 's/"[^"]*"//g' "$REPO_DIR/$doc")
+    hit=$(grep -inE "$banned_claim" <<< "$stripped" || true)
+    if [[ -n "$hit" ]]; then
+      banned_hits="$banned_hits
+  $doc: $(head -1 <<< "$hit")"
+    fi
+  done < <(git -C "$REPO_DIR" ls-files '*.md' | grep -Ev '^(profiles|commands|agents)/')
+  if [[ "$banned_files_checked" -gt 0 ]]; then ok "found docs to check, so this test is not vacuous"
+  else fail "found docs to check, so this test is not vacuous (found none)"; fi
+  if [[ -z "$banned_hits" ]]; then
+    ok "no doc claims a one-step plugin/marketplace install while marketplace.json is absent"
+  else
+    fail "no doc claims a one-step plugin/marketplace install while marketplace.json is absent (hits:$banned_hits)"
+  fi
+fi
+echo ""
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo "────────────────────────────────"

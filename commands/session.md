@@ -1,3 +1,8 @@
+---
+description: Show the worktree session status for this session
+disable-model-invocation: true
+---
+
 Run this command and report the output to the user: `claude-team session status`
 
 If a `.claude-session` marker is found (worktree session), surface:
