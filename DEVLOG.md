@@ -5,6 +5,44 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-30] Coordinator knew one handoff route out of three
+
+**Category:** `bugfix`
+**Tags:** `coordinator`, `handoff`, `model-tiers`, `subagents`, `sync`, `prompt-drift`
+
+**Risk Level:** `med`
+**Breaking Change:** `no`
+
+### Summary
+
+Both coordinator profiles offered the persona switch as though it were the only way to hand off, which is the one route where a persona's configured model tier is never applied. They now name all three routes and say what each costs.
+
+### Detail
+
+**The gap.** A handoff can take three forms. `/name` changes who the session is and keeps the whole conversation. Delegating to the `name` subagent keeps the session as it is and hands one scoped task over. `claude-team launch name` opens a second session. They differ in what the incoming persona can see and which model they run on.
+
+Grepping either coordinator profile for `launch`, `subagent`, or `delegate` returned nothing but Toni's role blurb. The coordinator knew one route and presented it as the only one. That route is the one where the session keeps whatever model it already had, so setting Akira to `claude-fable-5` in `profiles/tiers.conf` and following the coordinator's advice gets Akira on the session's model, silently.
+
+**This was drift, not a missing capability.** `README.md:62` and `:64` already documented delegation and launch to human readers, tier models included. Only the prompt was never told. Both profiles now carry a "three handoff routes" section, a `Format:` instruction that offers the fitting route and states its cost, and a 4-item Switching Reminders list. The Handoff Brief paragraph gained the reason it matters: a courtesy on a switch, where the incoming member can read the conversation, and required on a delegation, where it is the only thing they will see.
+
+**A trap worth recording.** Repo profile edits do not reach the installed coordinator through `claude-team coordinator on` alone. `_coordinator_install` reads `$PROFILES_DIR` (`~/.claude/team`), so it reports "profile refreshed" while re-injecting the old text. `claude-team sync` has to copy the profiles across first. Caught by grepping the installed block after the first refresh reported success. This is a fourth surface with the same class of failure the [2026-07-29] sync entry documented for the three persona copies.
+
+### Decisions Made
+
+- **Rejected: making the persona switch carry a model change.** No mechanism exists, since command and skill `model:` frontmatter lasts one turn and the session model resumes on the next prompt. Even if one existed, a mid-session model change re-reads the full history uncached, so the cost lands precisely where the switch's value is. And `/model <name>` typed directly saves the choice as the user's default for all new sessions, so putting it in handoff advice would rewrite a global setting during a session-scoped action. A new Boundaries line forbids both, matching the existing rule against changing permission modes.
+- **The tier belongs to the work, not the persona's identity.** `tiers.conf` names a model per persona as shorthand for that persona's typical stakes, which is right for delegation and launch, where a fresh context is built anyway. If this premise is wrong, nothing shipped becomes incorrect: every claim in the new prose is about observed mechanism behavior.
+- **Prod profile diverges on route 3.** It says "separate session in its own worktree" and points at its own worktree section, since prod enforces branch hygiene.
+- **No tests added.** Every profile loop in `tests/run.sh` skips `coordinator*`, so no test asserts on coordinator prose. The suite cannot catch a regression here, and building that assertion was out of scope. Worth raising with Robin separately.
+
+### Related
+
+- Commit `b300f78`
+- [2026-07-29] `claude-team sync`: one command for the three-copy persona problem (same failure class, fourth surface)
+- [2026-07-04] v0.7: established the session-scoped `/name` guidance this extends
+- `profiles/tiers.conf`, `scripts/generate-agents.sh:69` (skips `coordinator*`)
+
+---
+
 ## [2026-07-29] Two stale promises: a customization layer that should not exist, and a feature that already did
 
 **Category:** `decision`
