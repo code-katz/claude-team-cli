@@ -1652,6 +1652,43 @@ echo ""
 # commit that fixed a real drift) before being written, not against invented
 # examples.
 
+echo "CONTRIBUTING shellcheck command <-> ci.yml"
+
+# CONTRIBUTING tells a contributor to run shellcheck locally "because it runs in
+# CI, so running it here saves a round trip". That promise only holds while the
+# two lists name the same files. CONTRIBUTING listed five and CI ran six, missing
+# tests/check-links.sh, so a contributor could follow the documented steps, see a
+# silent shellcheck, push, and fail the lint job on a file they were never told
+# to check. A doc that is wrong about how to pass CI is worse than no doc.
+#
+# Both sides are read from the file that owns them and compared as sets, so
+# neither can be updated alone.
+sc_from() {
+  grep -oE 'shellcheck( +[A-Za-z0-9_./-]+)+' "$1" | head -1 | tr ' ' '\n' | sed 1d | sort
+}
+ci_sc=$(sc_from "$REPO_DIR/.github/workflows/ci.yml")
+doc_sc=$(sc_from "$REPO_DIR/CONTRIBUTING.md")
+if [[ -n "$ci_sc" && -n "$doc_sc" ]]; then
+  ok "found a shellcheck file list on both sides, so this test is not vacuous"
+else
+  fail "found a shellcheck file list on both sides, so this test is not vacuous (ci:$(wc -l <<< "$ci_sc") doc:$(wc -l <<< "$doc_sc"))"
+fi
+if [[ "$ci_sc" == "$doc_sc" ]]; then
+  ok "CONTRIBUTING lints the same files CI does"
+else
+  fail "CONTRIBUTING lints the same files CI does (only in CI:$(comm -23 <(echo "$ci_sc") <(echo "$doc_sc") | tr '\n' ' ')| only in CONTRIBUTING:$(comm -13 <(echo "$ci_sc") <(echo "$doc_sc") | tr '\n' ' '))"
+fi
+# Both lists staying in step with each other but drifting from the repo is the
+# failure a set comparison structurally cannot catch, so name the files too.
+missing_sc=""
+while read -r f; do
+  [[ -z "$f" ]] && continue
+  [[ -f "$REPO_DIR/$f" ]] || missing_sc="$missing_sc $f"
+done <<< "$ci_sc"
+if [[ -z "$missing_sc" ]]; then ok "every file in the shellcheck list exists"
+else fail "every file in the shellcheck list exists (missing:$missing_sc)"; fi
+echo ""
+
 echo "commands/ <-> README shipped-commands"
 
 # Every persona command (profiles/<name>.md, generated into

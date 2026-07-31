@@ -58,7 +58,7 @@ Both of these run in CI, so running them locally saves a round trip:
 
 ```bash
 bash tests/run.sh
-shellcheck bin/claude-team bin/team-session-start install.sh scripts/generate-agents.sh tests/run.sh
+shellcheck bin/claude-team bin/team-session-start install.sh scripts/generate-agents.sh tests/run.sh tests/check-links.sh
 ```
 
 The suite must be fully green. Shellcheck must be silent; it reads `.shellcheckrc` from the repo root, which documents the three disables and why each exists.
