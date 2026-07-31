@@ -453,6 +453,34 @@ resolve_name() {
   echo "$profile"
 }
 
+# The coordinator is a behavior layer, not a team member. It has its own marker
+# block, its own on/prod/off command, and both roster paths skip it: see the
+# 'coordinator*' cases in cmd_list and persona_roster. resolve_name did not, so
+# 'claude-team use coordinator' resolved, installed the coordinator profile into
+# the CLAUDE-TEAM block, and made 'status' report "Active team member: Claude
+# Team CLI". With the coordinator also enabled, ~/.claude/CLAUDE.md then held two
+# copies of the same instructions, one in each marker pair.
+#
+# Called by 'use' and 'launch', which treat a name as a persona, and NOT by
+# 'show', which only prints a file. Reading the coordinator profile is a
+# legitimate thing to want, and blocking it there would also break the test that
+# proves resolve_name's character class still accepts a hyphenated name.
+#
+# Called AFTER resolve_name, so a name that merely starts with "coordinator" and
+# has no profile still gets the "no profile found" message rather than this one.
+assert_is_persona() {
+  case "$1" in
+    coordinator*)
+      die "'$1' is the coordinator, not a team member, so it has no persona to activate.
+Enable it instead with:
+  claude-team coordinator on     (casual)
+  claude-team coordinator prod   (branch enforcement)
+To read the profile:
+  claude-team show $1"
+      ;;
+  esac
+}
+
 # Title parsing. Profile titles use the form "# Name — Role"; both parts
 # split at the FIRST em dash so a role may itself contain one.
 #
@@ -669,6 +697,7 @@ cmd_use() {
   name=$(lowercase "$1")
   local profile
   profile=$(resolve_name "$name")
+  assert_is_persona "$name"
 
   # 'use' pins the persona globally, so every future session reads what lands
   # here. The greeting is dropped: pinned, it makes every new session open with
@@ -1172,6 +1201,7 @@ cmd_launch() {
   name=$(lowercase "$1")
   shift
   profile=$(resolve_name "$name")
+  assert_is_persona "$name"
 
   local model task="" branch="" dry_run=false
   model=$(get_default_model "$name")

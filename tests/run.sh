@@ -212,6 +212,40 @@ out=$(run_cmd show coordinator-prod)
 assert_contains "hyphenated name still resolves" "Claude Team CLI" "$out"
 echo ""
 
+# The coordinator is a behavior layer, not a team member: it has its own marker
+# block, its own on/prod/off command, and both roster paths skip it. resolve_name
+# did not, so 'claude-team use coordinator' resolved and installed the
+# coordinator profile into the CLAUDE-TEAM block. 'status' then reported "Active
+# team member: Claude Team CLI", and with the coordinator also enabled the file
+# held two copies of the same instructions, one in each marker pair.
+echo "the coordinator is not a team member"
+assert_exits_nonzero "use rejects the coordinator"        "$CLI" use coordinator
+assert_exits_nonzero "use rejects the prod coordinator"   "$CLI" use coordinator-prod
+assert_exits_nonzero "launch rejects the coordinator"     "$CLI" launch coordinator --dry-run
+out=$(run_cmd use coordinator 2>&1 || true)
+assert_contains "the refusal points at the command that does work" "claude-team coordinator on" "$out"
+
+# Its own HOME, so the assertion holds wherever this section sits in the file.
+# Against the shared one it would depend on nothing earlier having installed a
+# block, which is true today and is not a property this test should rely on.
+COORD_HOME=$(mktemp -d)
+mkdir -p "$COORD_HOME/.claude"
+CLAUDE_TEAM_PROFILES="$PROFILES_DIR" HOME="$COORD_HOME" "$CLI" use coordinator >/dev/null 2>&1 || true
+assert_file_lacks "a rejected coordinator writes no persona block" \
+  "$COORD_HOME/.claude/CLAUDE.md" "CLAUDE-TEAM:START"
+rm -rf "$COORD_HOME"
+
+# Guard the guard, in the other direction. The check belongs on 'use' and
+# 'launch', which activate a name as a persona, and NOT in resolve_name, which
+# 'show' also goes through: printing the coordinator profile is a legitimate
+# thing to want, and coordinator-prod is the fixture the hyphenated-name test
+# above uses, so blocking it there would break that test for an unrelated reason.
+out=$(run_cmd show coordinator)
+assert_contains "show still reads the coordinator profile"      "Active Coordination" "$out"
+out=$(run_cmd show coordinator-prod)
+assert_contains "show still reads the prod coordinator profile" "Claude Team CLI"     "$out"
+echo ""
+
 # use — basic injection
 echo "use"
 run_cmd use robin >/dev/null
