@@ -453,6 +453,34 @@ resolve_name() {
   echo "$profile"
 }
 
+# The coordinator is a behavior layer, not a team member. It has its own marker
+# block, its own on/prod/off command, and both roster paths skip it: see the
+# 'coordinator*' cases in cmd_list and persona_roster. resolve_name did not, so
+# 'claude-team use coordinator' resolved, installed the coordinator profile into
+# the CLAUDE-TEAM block, and made 'status' report "Active team member: Claude
+# Team CLI". With the coordinator also enabled, ~/.claude/CLAUDE.md then held two
+# copies of the same instructions, one in each marker pair.
+#
+# Called by 'use' and 'launch', which treat a name as a persona, and NOT by
+# 'show', which only prints a file. Reading the coordinator profile is a
+# legitimate thing to want, and blocking it there would also break the test that
+# proves resolve_name's character class still accepts a hyphenated name.
+#
+# Called AFTER resolve_name, so a name that merely starts with "coordinator" and
+# has no profile still gets the "no profile found" message rather than this one.
+assert_is_persona() {
+  case "$1" in
+    coordinator*)
+      die "'$1' is the coordinator, not a team member, so it has no persona to activate.
+Enable it instead with:
+  claude-team coordinator on     (casual)
+  claude-team coordinator prod   (branch enforcement)
+To read the profile:
+  claude-team show $1"
+      ;;
+  esac
+}
+
 # Title parsing. Profile titles use the form "# Name — Role"; both parts
 # split at the FIRST em dash so a role may itself contain one.
 #
@@ -669,6 +697,7 @@ cmd_use() {
   name=$(lowercase "$1")
   local profile
   profile=$(resolve_name "$name")
+  assert_is_persona "$name"
 
   # 'use' pins the persona globally, so every future session reads what lands
   # here. The greeting is dropped: pinned, it makes every new session open with
@@ -1172,6 +1201,7 @@ cmd_launch() {
   name=$(lowercase "$1")
   shift
   profile=$(resolve_name "$name")
+  assert_is_persona "$name"
 
   local model task="" branch="" dry_run=false
   model=$(get_default_model "$name")
@@ -1516,6 +1546,46 @@ good surfaces and one stale one. Fix the error above, then rerun
 'claude-team sync': it recopies all three and brings them back level."
 }
 
+# Name the personas that are installed but no longer in the repo. sync only ever
+# copies, so deleting or renaming a persona leaves its three installed files
+# behind, and nothing else ever looks at them again. The roster is what makes
+# that visible: cmd_list and persona_roster read PROFILES_DIR, not the repo, so a
+# persona removed from the clone keeps appearing in 'claude-team list' and its
+# '/<name>' slash command keeps resolving, forever.
+#
+# Reported, not deleted, and that is deliberate. ~/.claude/commands and
+# ~/.claude/agents also hold files this tool never wrote, from other tools and
+# from the user, and sync has no marker that tells its own files apart from
+# theirs. A prune here would be an 'rm' driven by a guess about ownership, in the
+# user's global config, which is the one place this tool is careful everywhere
+# else: CLAUDE.md is protected by markers, settings.json by a merge, a foreign
+# pre-commit hook by an outright refusal. Naming the paths costs the user one
+# command and cannot destroy anything.
+warn_orphaned_personas() {
+  # The two destination directories are passed in rather than read from
+  # cmd_sync's locals. Bash scoping would make that work, because a called
+  # function sees its caller's locals, but it would tie this function to one
+  # call site invisibly and break under 'set -u' anywhere else.
+  local repo_profiles="$1" agents_dst="$2" commands_dst="$3" installed name
+  local orphans=()
+  for installed in "$PROFILES_DIR"/*.md; do
+    [[ -f "$installed" ]] || continue
+    name=$(basename "$installed" .md)
+    [[ -f "$repo_profiles/$name.md" ]] || orphans+=("$name")
+  done
+  # Guarded before any expansion of the array itself: '${orphans[@]}' on an empty
+  # array is an unbound variable under 'set -u' on Bash before 4.4, and the
+  # supported floor here is Bash 4. '${#orphans[@]}' is a count and is always safe.
+  (( ${#orphans[@]} > 0 )) || return 0
+  echo ""
+  echo "$(yellow "!") Installed but no longer in the repo: ${orphans[*]}"
+  echo "$(dim "  sync only copies, so a removed or renamed persona leaves its files behind.")"
+  echo "$(dim "  These still appear in 'claude-team list'. Nothing was deleted. To remove:")"
+  for name in "${orphans[@]}"; do
+    echo "  $(dim "rm -f $PROFILES_DIR/$name.md $agents_dst/$name.md $commands_dst/$name.md")"
+  done
+}
+
 # Regenerate agents from profiles, then copy all three installed surfaces from
 # the clone into ~/.claude. A persona exists as three self-contained files
 # (profile, slash command, subagent), so editing one installed copy leaves the
@@ -1561,6 +1631,9 @@ Make sure you are running this from the claude-team-cli repo."
   cp "$repo_dir/commands"/*.md "$commands_dst/" \
     || sync_die "Failed to copy slash commands into $commands_dst."
   echo "$(green "✓") Slash commands synced to $(dim "$commands_dst")"
+  # After all three copies land, so the comparison sees the state the user is
+  # left with rather than the one they started from.
+  warn_orphaned_personas "$repo_dir/profiles" "$agents_dst" "$commands_dst"
   say_session_scope
   echo ""
   echo "$(dim "Edit profiles in $repo_dir/profiles, then rerun: claude-team sync")"
