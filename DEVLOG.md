@@ -5,7 +5,87 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-07-31] Marketplace publishing retired, not deferred
+
+**Category:** `strategy`
+**Tags:** `plugin`, `distribution`, `marketplace`, `packaging`, `scope`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+claude-team-cli will not be published to a Claude Code plugin marketplace. A full packaging plan was built and costed at roughly two days, and the engineering was never the blocker. Two structural limits of the plugin system make the plugin form a different and worse product wearing this one's name.
+
+### Detail
+
+**What the plugin form cannot do.** Plugin commands are namespaced by the plugin's `name`, so `/akira` becomes `/claude-team:akira`. The bare `/akira` command is the product's entire ergonomic argument. Separately, a plugin's `bin/` is added to the Bash tool's PATH, not the user's login shell, so `claude-team launch`, `claude-team session start`, and the whole worktree workflow cannot ship through it. Those are commands a human types to *start* a session; a plugin cannot provide them by construction.
+
+**What it could do.** All seventeen persona commands (namespaced), all seventeen delegation subagents including their model tiers (already baked into agent frontmatter, so `tiers.conf` need not be readable at runtime), and the SessionStart hook. A real subset, and a coherent one. The judgment was that shipping it under the product's name costs more in confusion than it gains in reach.
+
+**A mitigation was considered and rejected with the whole path.** The namespace prefix is the `name` field, so renaming the plugin to `team` would have yielded `/team:akira` rather than `/claude-team:akira`, which is much closer to the real thing. That was not enough to rescue the second limit: `launch` and `session` still could not work.
+
+**What stays.** `.claude-plugin/plugin.json` and `hooks/hooks.json` remain. The plugin-shaped layout costs nothing and the claim that the repo is plugin-shaped is true. What is retired is publishing.
+
+### Decisions Made
+
+- **Retired rather than deferred.** Deferring would leave a "not yet" in the docs that keeps generating work and keeps a promise alive that nobody intends to keep. Recorded in ROADMAP Near-Term beside the local-profile-overrides retirement, which it rhymes with: both were rejected for creating a second, competing version of something the repo already owns.
+- **Rejected the "documented subset" option.** Akira's plan defined a defensible split (plugin as persona layer, CLI as orchestration layer) and recommended making it structural by excluding `bin/claude-team` from the package. Sound, and still rejected, because a partly-working `claude-team` is worse than none.
+- **Caught a defect the decision itself created.** Both README and ROADMAP read "not published to a marketplace **yet**", and that "yet" promised a plan that had just been cancelled. Corrected in both files in one pass with identical wording, applying the claim-scoped rule from the same session.
+- **Closed eight items as won't-do:** `marketplace.json`, `plugin.json` discovery metadata, the CI validation-masking safeguard, namespacing, plugin scope, the dual-install SessionStart collision, submission route, and versioning discipline. All existed only to serve the plugin path.
+
+### Related
+
+- Commit `d3e4945`
+- [2026-07-04] v0.7 — where the plugin packaging claim originated
+- [2026-07-31] The README sold an install path that does not exist — deferred this decision as "roughly half a day" of work; this entry closes it as won't-do
+- Akira's full costed packaging plan, including the measured CI validation-masking trap, exists only in session context and is not preserved in the repo
+
+---
+
+## [2026-07-31] Five review rounds, five different lists: replacing doc review with doc assertions
+
+**Category:** `infrastructure`
+**Tags:** `doc-drift`, `testing`, `ci`, `review-convergence`, `process`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+Five consecutive sessions ran persona doc reviews, and each returned a different list of findings, which read as a repo that kept breaking. The repo was not the problem. Reviews were the only detection mechanism for doc-vs-code drift, and an open-ended review prompt has no floor, so it never converges. Eighteen assertions in `tests/run.sh` now do the detecting.
+
+### Detail
+
+**Why the lists never repeated.** "Review the docs" is an unbounded generator. Any persona asked to find problems will find problems, and two personas with two lenses produce two non-overlapping lists indefinitely. Framing this round as a verdict against a fixed bar (blocker / should-fix / nit, capped at three nits) converged immediately: Toni returned SHIP with one finding, River returned DO-NOT-SHIP on exactly one line.
+
+**The compounding cause was scope, not volume.** Fixes had been file-scoped rather than claim-scoped. Commit `2010acc` corrected the false "installs as a plugin in one step" claim in `README.md` and left the identical claim standing in `ROADMAP.md:19`, so the following review found "a new bug" that was the same bug in a file nobody had opened. The prior entry even names the missing guard: "`tests/run.sh:1218` asserts only that `plugin.json` is valid JSON, which is why a false headline feature survived a release." The gap was identified and left open.
+
+**What the round produced.** 22 findings across four delegated specialists: Toni (positioning), River (requirements and user journey), Akira (packaging, who executed `claude plugin validate` against the repo rather than reasoning from docs), Robin (tests). One blocker, and it was River's: `ROADMAP.md:19`. Akira reached the same defect independently from the packaging side, which is what raised confidence enough to act without a third opinion.
+
+**The assertions.** Eighteen new checks in `tests/run.sh`, all deriving both sides from the filesystem or the CLI source rather than hardcoding values: `commands/` against the README list in both directions, the `bin/claude-team` dispatch against README Usage, every internal link and file path, `TEAM.md` against `profiles/`, frontmatter on every command, and a banned-claim check gated on `marketplace.json` being absent, so it disables itself if the plugin path ever becomes real. `tests/check-links.sh` covers external URL redirects separately.
+
+**The tests were verified to fail.** Three historical bugs were reintroduced (the false plugin claim, stripped frontmatter, a dead file path) and each turned the suite red naming the offending file. A green suite that does not catch the bug is worse than no suite, because it launders the absence of checking as evidence of correctness.
+
+### Decisions Made
+
+- **Bounded the review prompt instead of running another open review.** A ship/no-ship bar with a three-nit cap. Rejected a sixth open-ended round, which would have produced a sixth non-overlapping list at the same cost.
+- **Robin declined a README/ROADMAP byte-sync test, and was right.** It would enforce that the two locations *agree*, not that they are *true*, and would go red on an innocent reword until people learned to ignore it. The banned-claim check already catches the real failure in either file independently.
+- **Banned-claim check strips double-quoted spans rather than excluding files by name.** Verified empirically: with quoting removed, both `CONTRIBUTING.md` and the ROADMAP revision-history row do match the banned pattern, which proves the stripping is doing the work. A third file quoting the retired claim tomorrow needs no test change; a hardcoded exclusion list would have.
+- **External link check is opt-in and off the PR path.** `run.sh` promises "no external dependencies required" in its own header, and a rate-limited runner must never redden an unrelated PR.
+- **Toni reversed her own nit on section ordering and changed nothing.** Moving "Who This Is For" above the demo would gate the reader before the payoff, and it is structurally impossible anyway without renesting an H2 under an H1.
+- **Wrote the rule into `CONTRIBUTING.md`: fix the claim, not the file.** Citing this incident by name, so the failure mode is documented rather than remembered.
+
+### Related
+
+- Commits `007c82c` (fixes and assertions), `d3e4945` (marketplace retirement)
+- [2026-07-31] The README sold an install path that does not exist — the round that fixed the README copy and missed ROADMAP
+- **The Fable 5 tier gap recurred.** Both River and Akira died on `You've reached your Fable 5 limit` and were re-run on Opus. The prior entry flagged this as "worth its own work" and it is still unaddressed. Six of seventeen personas are pinned to `claude-fable-5`, so a third of the roster is unreliable for delegation whenever that budget is exhausted.
+
+---
+
 ## [2026-07-31] The README sold an install path that does not exist
+> **PARTIALLY SUPERSEDED [2026-07-31]:** The decision "Fixed the plugin copy, did not build the plugin," which framed plugin packaging as roughly half a day of pending work, is superseded by [2026-07-31] Marketplace publishing retired, not deferred. Publishing is now retired as a goal, not queued. Everything else in this entry remains current: the accuracy corrections, the deleted test count, the stop-enumerating decision, and the structural reorder.
 
 **Category:** `bugfix`
 **Tags:** `readme`, `positioning`, `plugin`, `doc-drift`, `ci`, `model-tiers`
