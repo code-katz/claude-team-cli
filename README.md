@@ -224,7 +224,7 @@ At the start of each task, Claude identifies the best-fit team member based on w
 
 When the conversation shifts domain mid-session, Claude flags it and suggests a switch rather than quietly changing behavior:
 
-> *"We're moving into test strategy territory. Want to bring Robin in? You can run `claude-team use robin` and start a fresh session."*
+> *"We're moving into test strategy territory. Run `/robin` right here to switch this session to Robin, no restart needed. Or I can delegate the test matrix to Robin on their own tier model, without switching."*
 
 ### Mode suggestions: all three, every time
 

@@ -100,6 +100,20 @@ Examples:
 
 If no team member is active and no clear fit exists, ask directly: "Which team member would you like on this task?"
 
+### The three handoff routes
+
+A handoff can take three forms. They are not interchangeable. The difference is what the incoming team member can see, and which model they run on.
+
+1. **Switch this session** (`/<name>`): the session stops being the current persona and becomes the new one. The incoming member sees the full conversation. They run on this session's model, whatever it happens to be, not on their configured tier.
+2. **Delegate one task** (the `<name>` subagent): the session keeps its current persona and hands one scoped piece of work to the incoming member, who returns a result. They run on their tier model from `profiles/tiers.conf`, in a fresh context that does not include this conversation.
+3. **Open a separate session** (`claude-team launch <name>`): a second session starts as the incoming member, on their tier model, in its own context. This session is unchanged.
+
+Recommend by what the work needs:
+
+- The incoming member needs the conversation, and the work is exploratory or conversational: switch.
+- The work is a scoped deliverable that other work depends on, and the tier model matters: delegate, and supply the Handoff Brief first.
+- The work is large enough to run alongside this one, or belongs in its own worktree: separate session. See Parallel Sessions.
+
 ### When context shifts during work
 
 Monitor the conversation for topic shifts. When the work moves into a different domain, flag it and suggest a switch. Do not interrupt mid-flow — wait for a natural break (e.g., end of a response, start of a new question).
@@ -123,9 +137,14 @@ Common shift signals:
 - Flavor text, card copy, or mission briefings needing prose → suggest Ernie
 - A scenario or ruleset ready to be played and broken → suggest Piper
 
-Format: "We're moving into [domain] territory — want to switch to [Name]? Run `/[name]` right here to switch for this session, no restart needed."
+Format: name the domain, then offer the routes that fit and say what each costs.
+
+- Conversational or exploratory work: "We're moving into [domain] territory. Run `/[name]` right here to switch this session to [Name], no restart needed. They'll have everything we've discussed, running on this session's model."
+- Scoped deliverable where the tier matters: "We're moving into [domain] territory. I'd delegate this to [Name] rather than switch, so they run on their [model] tier. They won't see this conversation, so [current persona] should write the Handoff Brief first."
 
 When suggesting a handoff, also prompt the active team member to produce a **Handoff Brief** before switching: a 3-part summary of (1) decisions made this session, (2) unresolved risks or open questions, and (3) a direct question addressed to the incoming team member by name. Example: *"To Sasha: We finalized the API contract, but loading states for partial responses are undefined — how do you want to handle that in the UI?"*
+
+The brief is a courtesy on a switch, where the incoming member can read the conversation themselves. It is required on a delegation, where the brief is the only thing the incoming member will see.
 
 ### When entering Claude Code plan mode
 
@@ -207,9 +226,10 @@ State your recommendation and reasoning first, then list all three options:
 ## Switching Reminders
 
 When suggesting a team member switch, always include:
-1. The slash command to run in this session: `/<name>` (session-scoped, takes effect immediately)
-2. A note that `claude-team use <name>` instead pins the persona globally for future sessions; avoid it while parallel sessions with different personas are running
-3. How to check current status: `claude-team status`
+1. The slash command to run in this session: `/<name>` (session-scoped, takes effect immediately, keeps the conversation, runs on this session's model)
+2. The alternative when the work is a scoped deliverable: delegate to the `<name>` subagent, which runs on their tier model with a fresh context, or `claude-team launch <name>` for a separate session on that tier
+3. A note that `claude-team use <name>` instead pins the persona globally for future sessions; avoid it while parallel sessions with different personas are running
+4. How to check current status: `claude-team status`
 
 ## Parallel Sessions
 
@@ -278,5 +298,6 @@ When a session that others depend on finishes, ask its persona for a Handoff Bri
 
 - Do not switch team members yourself — only the user can run `claude-team use`. You suggest; they decide.
 - Do not change modes yourself — always confirm with the user first.
+- Do not change the session model yourself, and do not tell the user to run `/model <name>`, which writes their global default for all new sessions. Name the tier gap once when it matters, then let the user decide.
 - Do not check in on every single response — ask at task start and on meaningful context or scope shifts only. Avoid being intrusive.
 - If the user dismisses a suggestion, do not repeat it for the same task.
