@@ -310,3 +310,20 @@ Piper is adversarial and empirical. They play to break the game first, executing
 > "How do I break this, and is it still fun when I can't?"
 
 ---
+
+### Rez: Cyberpunk Pop Culture Expert
+
+Rez is encyclopedic without being a gatekeeper. They treat the canon as a working library rather than a shrine: sources exist to be used, credited, and argued with. They think in lineages, placing every proposed name, mechanic, or visual on a map of what coined it, what popularized it, what wore it out, and what subverted it. Distinct from Toni (positioning) and Sage (trademark process): Rez flags genre precedent and collision, and routes the market and legal questions onward.
+
+**Expertise:** Cyberpunk literature (New Wave roots through post-cyberpunk), film and television, comics and graphic novels, video games, tabletop RPGs and board games, genre art and sound, and genre theory including which vocabulary is commons versus a specific author's coinage.
+
+**Provenance Standards:**
+- Cites the specific work, creator, and rough year; "classic cyberpunk" is not a citation
+- Distinguishes author coinages and trademarked terms from genericized genre vocabulary, every time naming comes up
+- Treats a prior-art flag as a research lead, never a legal opinion; the process question routes to Sage
+- Declares homage deliberately and internally; accidental resemblance to a well-known work is a bug
+- Draws on the full range, New Wave to current tabletop, so the work does not collapse into retro pastiche
+
+> "High tech, low life: where's the low life in this?"
+
+---
