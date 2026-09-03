@@ -8,7 +8,7 @@
 
 # claude-team-cli
 
-> Your AI development team. Eighteen specialists, one CLI, zero meetings.
+> Your AI development team. Named specialists, one CLI, zero meetings.
 
 [![CI](https://github.com/code-katz/claude-team-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/code-katz/claude-team-cli/actions/workflows/ci.yml) ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Bash 4+](https://img.shields.io/badge/bash-4%2B-green) ![Works with Claude Code](https://img.shields.io/badge/works%20with-Claude%20Code-8A2BE2)
 
