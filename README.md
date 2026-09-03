@@ -22,7 +22,7 @@ That's what this is.
 
 `claude-team-cli` gives you a crew of named, specialized Claude personas, each one a formal expert consultant with deep domain knowledge, a distinct way of thinking, and enterprise-grade security instincts baked in. You pick who's on the task, and Claude shows up as that person.
 
-Need to define requirements? Call River. Design an API? Akira. Building a component that has to be accessible and secure? That's Sasha's world. Need a mockup before anyone writes code? Kai will have a device-frame HTML wireframe in your browser before the discussion goes abstract. Data pipelines or ML ops? Jordan. Dashboards and metrics? Casey. Security review or threat model? Morgan. Designing your deployment pipeline? Alex. Writing tests? Robin's got it. Planning a launch? Toni. Making sure everything actually ships on time? Quinn. Figuring out how to form your company, manage finances, or avoid legal landmines? That's Sage. Building a tabletop game? Reiner designs the mechanics, Cornelius keeps the history honest, Ernie writes the flavor, and Piper plays it until it breaks.
+Need to define requirements? Call River. Design an API? Akira. Building a component that has to be accessible and secure? That's Sasha's world. Need a mockup before anyone writes code? Kai will have a device-frame HTML wireframe in your browser before the discussion goes abstract. Data pipelines or ML ops? Jordan. Dashboards and metrics? Casey. Security review or threat model? Morgan. Designing your deployment pipeline? Alex. Writing tests? Robin's got it. Planning a launch? Toni. Making sure everything actually ships on time? Quinn. Figuring out how to form your company, manage finances, or avoid legal landmines? That's Sage. Need a logo, an icon set, or marketing art? Iris. Building a tabletop game? Reiner designs the mechanics, Cornelius keeps the history honest, Ernie writes the flavor, and Piper plays it until it breaks. Building inside a genre? Rez tells you what has already been done with that name, that trope, and that look, and whether the reference you want is free to take.
 
 ### How it works in practice
 
@@ -74,11 +74,13 @@ Generic Claude gives you a checklist. Robin reframes the problem, identifies the
 
 Solo developers and small teams doing work that spans multiple domains, without a roomful of specialists to pull into a conversation.
 
-If you're the only engineer on a project, or one of a small team where everyone wears multiple hats, `claude-team-cli` gives you access to expert-level thinking in domains outside your primary strength. Not generic AI help. A named specialist who thinks the way that domain actually thinks, asks the questions a senior practitioner would ask, and pushes back when something's off.
+If you're the only engineer on a project, or one of a small team where everyone wears multiple hats, `claude-team-cli` gives you access to expert-level thinking in domains outside your primary strength: the ones around your code as well as the ones inside it, from threat models to launch messaging to whether the name you just picked already belongs to somebody. Not generic AI help. A named specialist who thinks the way that domain actually thinks, asks the questions a senior practitioner would ask, and pushes back when something's off.
 
 ---
 
 ## The Team at a Glance
+
+Fourteen specialists for building and shipping a product, and four more below for tabletop game work. Same profile structure, same generator, one roster: the framework is not limited to software, and neither is the team.
 
 | Name | Role | Ask them about |
 |---|---|---|
@@ -109,6 +111,8 @@ A four-person studio for card and board game projects, and a working demonstrati
 | Cornelius | Military Historian | WW2 order of battle, weapons, tactics, chronology, operational significance |
 | Ernie | WW2 Narrative Author | Flavor text, mission briefings, card copy, historical prose |
 | Piper | Tabletop Playtester | Session reports, dominant lines, balance swings, first-play confusion |
+
+Rez sits in the roster above rather than in this studio, and works alongside it. For a game set inside a genre rather than a period, Rez checks what the genre has already done with that name, that mechanic, or that look before Reiner commits to it.
 
 ---
 
