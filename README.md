@@ -8,7 +8,7 @@
 
 # claude-team-cli
 
-> Your AI development team. Seventeen specialists, one CLI, zero meetings.
+> Your AI development team. Eighteen specialists, one CLI, zero meetings.
 
 [![CI](https://github.com/code-katz/claude-team-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/code-katz/claude-team-cli/actions/workflows/ci.yml) ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Bash 4+](https://img.shields.io/badge/bash-4%2B-green) ![Works with Claude Code](https://img.shields.io/badge/works%20with-Claude%20Code-8A2BE2)
 
@@ -540,8 +540,8 @@ claude-team-cli/
 │   ├── coordinator.md        # casual-mode check-in behavior layer
 │   ├── coordinator-prod.md   # prod-mode layer: branch enforcement, MR/PR flow
 │   └── tiers.conf            # persona to model tier mapping
-├── commands/                 # generated: 17 persona commands + 10 workflow commands
-├── agents/                   # generated: 17 delegation subagents
+├── commands/                 # generated: 18 persona commands + 10 workflow commands
+├── agents/                   # generated: 18 delegation subagents
 ├── scripts/
 │   └── generate-agents.sh    # regenerates commands/ and agents/ from profiles/
 ├── hooks/
