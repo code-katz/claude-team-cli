@@ -80,7 +80,7 @@ If you're the only engineer on a project, or one of a small team where everyone 
 
 ## The Team at a Glance
 
-Fourteen specialists for building and shipping a product, and four more below for tabletop game work. Same profile structure, same generator, one roster: the framework is not limited to software, and neither is the team.
+Specialists for building and shipping a product, and a studio below for tabletop game work. Same profile structure, same generator, one roster: the framework is not limited to software, and neither is the team.
 
 | Name | Role | Ask them about |
 |---|---|---|
@@ -99,11 +99,11 @@ Fourteen specialists for building and shipping a product, and four more below fo
 | Iris | Brand & Illustration | Logos, icon sets, illustration, marketing graphics, asset licensing |
 | Rez | Cyberpunk Genre Advisor | Genre precedent, name and term collisions, homage versus cliché, what to read or watch |
 
-Full profiles for all eighteen are in [TEAM.md](TEAM.md).
+Full profiles for the whole roster are in [TEAM.md](TEAM.md).
 
 ### The Game Development Team
 
-A four-person studio for card and board game projects, and a working demonstration that the persona framework is not just for software. Built from the same profile structure and the same generator as the rest of the team, the four hold their lanes and hand off by name: Reiner designs the systems, Cornelius verifies the history, Ernie writes the words, and Piper tries to break it all.
+A four-person studio for card and board game projects. The four hold their lanes and hand off by name: Reiner designs the systems, Cornelius verifies the history, Ernie writes the words, and Piper tries to break it all.
 
 | Name | Role | Ask them about |
 |---|---|---|
@@ -364,7 +364,7 @@ Branch state persists across sessions and across projects. Use `claude-team bran
 ## Usage
 
 ```bash
-# See your team — the canonical roster of all eighteen
+# See your team — the canonical roster
 claude-team list
 
 # Read any team member's full profile
@@ -422,7 +422,7 @@ After activating a team member with `claude-team use`, **start a new Claude Code
 **Slash commands that ship with this repo** (installed by `install.sh`, no companion skills required):
 
 ```bash
-/river /akira /sasha ...   # switch this session to any of the eighteen specialists
+/river /akira /sasha ...   # switch this session to any specialist on the roster
 /team                      # show the roster and who is currently active
 /parallel                  # generate a parallel session plan with persona + task + file scope
 /branch                    # show active branch status; propose a branch name if none is registered
@@ -530,7 +530,7 @@ A profile needs a `## Greeting` section, holding the one line the persona says w
 ```
 claude-team-cli/
 ├── README.md
-├── TEAM.md                   # full profiles for all eighteen
+├── TEAM.md                   # full profiles for the whole roster
 ├── WRITING.md                # plain technical English standard
 ├── CONTRIBUTING.md
 ├── ROADMAP.md
@@ -540,12 +540,12 @@ claude-team-cli/
 │   ├── claude-team           # CLI script
 │   └── team-session-start    # SessionStart hook entry point
 ├── profiles/                 # the only source of truth for every persona
-│   ├── <name>.md             # one per specialist, eighteen in total
+│   ├── <name>.md             # one file per specialist
 │   ├── coordinator.md        # casual-mode check-in behavior layer
 │   ├── coordinator-prod.md   # prod-mode layer: branch enforcement, MR/PR flow
 │   └── tiers.conf            # persona to model tier mapping
-├── commands/                 # generated: 18 persona commands + 10 workflow commands
-├── agents/                   # generated: 18 delegation subagents
+├── commands/                 # generated: one command per persona + 10 workflow commands
+├── agents/                   # generated: one delegation subagent per persona
 ├── scripts/
 │   └── generate-agents.sh    # regenerates commands/ and agents/ from profiles/
 ├── hooks/
@@ -592,7 +592,7 @@ v1 gave you the team. v2 makes the team dependable: every session gets its own p
 
 **`claude-team launch <persona>`** — open a dedicated Claude Code session with the persona baked in as system prompt, on its tier model (Fable 5 for the deep-reasoning personas, Opus 4.8 for consulting and craft, Sonnet 5 for implementation), optionally inside an isolated worktree: `claude-team launch akira --task "design the battles API" --worktree session/1-akira-battles`.
 
-**Delegation subagents** — eighteen generated agents let any session hand work to a persona ("have Robin review this diff") without switching. Regenerate from profiles with `claude-team sync`.
+**Delegation subagents** — one generated agent per persona lets any session hand work to a specialist ("have Robin review this diff") without switching. Regenerate from profiles with `claude-team sync`.
 
 **Worktree-isolated `/parallel`** — session plans create a git worktree per session and never switch branches; the coordination session merges in dependency order.
 
