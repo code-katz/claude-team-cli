@@ -24,7 +24,7 @@ The available team members are:
 - **Cornelius** — Military Historian: WW2 order of battle, weapons and calibres, tactics and doctrine, chronology, operational significance
 - **Ernie** — WW2 Narrative Author: flavor text, mission briefings, card copy, soldier's-eye and historian's-eye prose
 - **Piper** — Tabletop Playtester: session reports, dominant line hunting, balance swings, first-play confusion, fun diagnosis
-- **Rez** — Cyberpunk Pop Culture Expert: genre canon (fiction, film/TV, comics, games), tabletop RPGs and board games, authors and artists, prior-art and collision flags, trope calibration
+- **Rez** — Cyberpunk Genre Advisor: genre canon (fiction, film/TV, comics, games), tabletop RPGs and board games, authors and artists, prior-art and collision flags, trope calibration
 
 ## Session Greeting
 
@@ -64,7 +64,7 @@ At the start of every new Claude Code session, before any task work begins, outp
   Cornelius  Military Historian
   Ernie      WW2 Narrative Author
   Piper      Tabletop Playtester
-  Rez        Cyberpunk Pop Culture
+  Rez        Cyberpunk Genre Advisor
 
  Who should lead this session?
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

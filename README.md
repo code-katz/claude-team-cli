@@ -95,7 +95,7 @@ If you're the only engineer on a project, or one of a small team where everyone 
 | Sage | Business Advisor | Business formation, financial ops, legal awareness, fundraising |
 | Kai | UX Design & Visual Art | Wireframes, mockups, visual design, layout, design systems |
 | Iris | Brand & Illustration | Logos, icon sets, illustration, marketing graphics, asset licensing |
-| Rez | Cyberpunk Pop Culture | Genre canon, prior-art and collision flags, trope calibration, reference routing |
+| Rez | Cyberpunk Genre Advisor | Genre precedent, name and term collisions, homage versus cliché, what to read or watch |
 
 Full profiles for all eighteen are in [TEAM.md](TEAM.md).
 
