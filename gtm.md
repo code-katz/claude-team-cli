@@ -19,11 +19,11 @@ These people don't need to be sold on Claude. They need to be sold on **the diff
 
 claude-team-cli is not a prompt library. It's not a collection of system prompts you paste into a chat window.
 
-It's a named, opinionated specialist who shows up with domain expertise, asks the questions a senior practitioner would ask, and pushes back when something's off. Seventeen of them. Thirteen cover the full product development lifecycle from discovery to launch. The other four are a tabletop-game studio, and they exist to answer the one objection this category always draws.
+It's a named, opinionated specialist who shows up with domain expertise, asks the questions a senior practitioner would ask, and pushes back when something's off. A roster of them. Most cover the full product development lifecycle from discovery to launch. Four of them are a tabletop-game studio, and they exist to answer the one objection this category always draws.
 
 **The objection, and the answer.** "If it just injects a persona, why not wire up the two or three specialists I care about myself, in an afternoon?" You could. The mechanism was never the moat. Copying a profile is easy; curating specialists who hold a lane and hand off to each other cleanly is the work, and that is what a session actually runs on. The proof is the game studio: Reiner (design), Cornelius (history), Ernie (narrative), and Piper (playtesting) form an interlocking four-person team in a domain the tool was never built for, assembled from the same profile structure as the software specialists. Anyone can paste three prompts; a coherent studio that holds its lanes and hands off by name is a different claim, and it is the one worth paying attention to.
 
-**One-line positioning:** *Your AI development team. Seventeen specialists, one CLI, zero meetings.*
+**One-line positioning:** *Your AI development team. Named specialists, one CLI, zero meetings.*
 
 ### Differentiation Hook
 
@@ -206,6 +206,8 @@ The scenario is absurd enough to be memorable and complex enough to be real.
 
 ---
 
+> **Sections 5 to 7 are drafted post copy.** Roster figures in them are point-in-time snapshots, not maintained numbers. Re-check any count against `claude-team list` immediately before publishing.
+
 ## 5. Post 0 — "Meet My Claude Dev Team"
 
 *Target: Medium publication. ~1400 words.*
@@ -214,7 +216,7 @@ The scenario is absurd enough to be memorable and complex enough to be real.
 
 ### Meet My Claude Dev Team
 
-**Seventeen specialists. One CLI. Zero meetings.**
+**Named specialists. One CLI. Zero meetings.**
 
 ---
 
@@ -234,7 +236,7 @@ So I built a team of them.
 
 #### What claude-team-cli actually does
 
-It gives you seventeen named specialist personas for Claude Code. Each one is a formal expert consultant with deep domain knowledge, a distinct way of thinking, and real opinions about how work should be done.
+It gives you named specialist personas for Claude Code. Each one is a formal expert consultant with deep domain knowledge, a distinct way of thinking, and real opinions about how work should be done.
 
 You pick who's on the task. Claude shows up as that person.
 
@@ -354,7 +356,7 @@ Same product, ten different specialists, and the tools that make sure none of it
 ### Post Body (paste directly into LinkedIn)
 
 ```
-I built a 17-person AI dev team inside Claude Code.
+I built an 18-person AI dev team inside Claude Code.
 
 Not prompt templates. A CLI that gives Claude named
 specialist personas — senior consultants with domain
@@ -380,7 +382,7 @@ Robin: Before I sketch the strategy, I need to
 That's not a checklist. That's a senior QA engineer
 reframing the problem before touching a test file.
 
-Robin is one of seventeen. Two-minute install. Open source.
+Robin is one of eighteen. Two-minute install. Open source.
 
 What domain do you wish you had a specialist for?
 
@@ -432,7 +434,7 @@ What would you automate first?
 ```
 Repos:
 
-Team CLI (17 specialist personas):
+Team CLI (18 specialist personas):
 github.com/code-katz/claude-team-cli
 
 Companion skills:

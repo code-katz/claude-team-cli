@@ -8,7 +8,7 @@
 
 # claude-team-cli
 
-> Your AI development team. Seventeen specialists, one CLI, zero meetings.
+> Your AI development team. Named specialists, one CLI, zero meetings.
 
 [![CI](https://github.com/code-katz/claude-team-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/code-katz/claude-team-cli/actions/workflows/ci.yml) ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![Bash 4+](https://img.shields.io/badge/bash-4%2B-green) ![Works with Claude Code](https://img.shields.io/badge/works%20with-Claude%20Code-8A2BE2)
 
@@ -22,7 +22,7 @@ That's what this is.
 
 `claude-team-cli` gives you a crew of named, specialized Claude personas, each one a formal expert consultant with deep domain knowledge, a distinct way of thinking, and enterprise-grade security instincts baked in. You pick who's on the task, and Claude shows up as that person.
 
-Need to define requirements? Call River. Design an API? Akira. Building a component that has to be accessible and secure? That's Sasha's world. Need a mockup before anyone writes code? Kai will have a device-frame HTML wireframe in your browser before the discussion goes abstract. Data pipelines or ML ops? Jordan. Dashboards and metrics? Casey. Security review or threat model? Morgan. Designing your deployment pipeline? Alex. Writing tests? Robin's got it. Planning a launch? Toni. Making sure everything actually ships on time? Quinn. Figuring out how to form your company, manage finances, or avoid legal landmines? That's Sage. Building a tabletop game? Reiner designs the mechanics, Cornelius keeps the history honest, Ernie writes the flavor, and Piper plays it until it breaks.
+Need to define requirements? Call River. Design an API? Akira. Building a component that has to be accessible and secure? That's Sasha's world. Need a mockup before anyone writes code? Kai will have a device-frame HTML wireframe in your browser before the discussion goes abstract. Data pipelines or ML ops? Jordan. Dashboards and metrics? Casey. Security review or threat model? Morgan. Designing your deployment pipeline? Alex. Writing tests? Robin's got it. Planning a launch? Toni. Making sure everything actually ships on time? Quinn. Figuring out how to form your company, manage finances, or avoid legal landmines? That's Sage. Need a logo, an icon set, or marketing art? Iris. Building a tabletop game? Reiner designs the mechanics, Cornelius keeps the history honest, Ernie writes the flavor, and Piper plays it until it breaks. Building inside a genre? Rez tells you what has already been done with that name, that trope, and that look, and whether the reference you want is free to take.
 
 ### How it works in practice
 
@@ -74,11 +74,13 @@ Generic Claude gives you a checklist. Robin reframes the problem, identifies the
 
 Solo developers and small teams doing work that spans multiple domains, without a roomful of specialists to pull into a conversation.
 
-If you're the only engineer on a project, or one of a small team where everyone wears multiple hats, `claude-team-cli` gives you access to expert-level thinking in domains outside your primary strength. Not generic AI help. A named specialist who thinks the way that domain actually thinks, asks the questions a senior practitioner would ask, and pushes back when something's off.
+If you're the only engineer on a project, or one of a small team where everyone wears multiple hats, `claude-team-cli` gives you access to expert-level thinking in domains outside your primary strength: the ones around your code as well as the ones inside it, from threat models to launch messaging to whether the name you just picked already belongs to somebody. Not generic AI help. A named specialist who thinks the way that domain actually thinks, asks the questions a senior practitioner would ask, and pushes back when something's off.
 
 ---
 
 ## The Team at a Glance
+
+Specialists for building and shipping a product, and a studio below for tabletop game work. Same profile structure, same generator, one roster: the framework is not limited to software, and neither is the team.
 
 | Name | Role | Ask them about |
 |---|---|---|
@@ -95,12 +97,13 @@ If you're the only engineer on a project, or one of a small team where everyone 
 | Sage | Business Advisor | Business formation, financial ops, legal awareness, fundraising |
 | Kai | UX Design & Visual Art | Wireframes, mockups, visual design, layout, design systems |
 | Iris | Brand & Illustration | Logos, icon sets, illustration, marketing graphics, asset licensing |
+| Rez | Cyberpunk Genre Advisor | Genre precedent, name and term collisions, homage versus cliché, what to read or watch |
 
-Full profiles for all seventeen are in [TEAM.md](TEAM.md).
+Full profiles for the whole roster are in [TEAM.md](TEAM.md).
 
 ### The Game Development Team
 
-A four-person studio for card and board game projects, and a working demonstration that the persona framework is not just for software. Built from the same profile structure and the same generator as the rest of the team, the four hold their lanes and hand off by name: Reiner designs the systems, Cornelius verifies the history, Ernie writes the words, and Piper tries to break it all.
+A four-person studio for card and board game projects. The four hold their lanes and hand off by name: Reiner designs the systems, Cornelius verifies the history, Ernie writes the words, and Piper tries to break it all.
 
 | Name | Role | Ask them about |
 |---|---|---|
@@ -108,6 +111,8 @@ A four-person studio for card and board game projects, and a working demonstrati
 | Cornelius | Military Historian | WW2 order of battle, weapons, tactics, chronology, operational significance |
 | Ernie | WW2 Narrative Author | Flavor text, mission briefings, card copy, historical prose |
 | Piper | Tabletop Playtester | Session reports, dominant lines, balance swings, first-play confusion |
+
+Rez sits in the roster above rather than in this studio, and works alongside it. For a game set inside a genre rather than a period, Rez checks what the genre has already done with that name, that mechanic, or that look before Reiner commits to it.
 
 ---
 
@@ -359,7 +364,7 @@ Branch state persists across sessions and across projects. Use `claude-team bran
 ## Usage
 
 ```bash
-# See your team — the canonical roster of all seventeen
+# See your team — the canonical roster
 claude-team list
 
 # Read any team member's full profile
@@ -417,7 +422,7 @@ After activating a team member with `claude-team use`, **start a new Claude Code
 **Slash commands that ship with this repo** (installed by `install.sh`, no companion skills required):
 
 ```bash
-/river /akira /sasha ...   # switch this session to any of the seventeen specialists
+/river /akira /sasha ...   # switch this session to any specialist on the roster
 /team                      # show the roster and who is currently active
 /parallel                  # generate a parallel session plan with persona + task + file scope
 /branch                    # show active branch status; propose a branch name if none is registered
@@ -525,7 +530,7 @@ A profile needs a `## Greeting` section, holding the one line the persona says w
 ```
 claude-team-cli/
 ├── README.md
-├── TEAM.md                   # full profiles for all seventeen
+├── TEAM.md                   # full profiles for the whole roster
 ├── WRITING.md                # plain technical English standard
 ├── CONTRIBUTING.md
 ├── ROADMAP.md
@@ -535,12 +540,12 @@ claude-team-cli/
 │   ├── claude-team           # CLI script
 │   └── team-session-start    # SessionStart hook entry point
 ├── profiles/                 # the only source of truth for every persona
-│   ├── <name>.md             # one per specialist, seventeen in total
+│   ├── <name>.md             # one file per specialist
 │   ├── coordinator.md        # casual-mode check-in behavior layer
 │   ├── coordinator-prod.md   # prod-mode layer: branch enforcement, MR/PR flow
 │   └── tiers.conf            # persona to model tier mapping
-├── commands/                 # generated: 17 persona commands + 10 workflow commands
-├── agents/                   # generated: 17 delegation subagents
+├── commands/                 # generated: one command per persona + 10 workflow commands
+├── agents/                   # generated: one delegation subagent per persona
 ├── scripts/
 │   └── generate-agents.sh    # regenerates commands/ and agents/ from profiles/
 ├── hooks/
@@ -587,7 +592,7 @@ v1 gave you the team. v2 makes the team dependable: every session gets its own p
 
 **`claude-team launch <persona>`** — open a dedicated Claude Code session with the persona baked in as system prompt, on its tier model (Fable 5 for the deep-reasoning personas, Opus 4.8 for consulting and craft, Sonnet 5 for implementation), optionally inside an isolated worktree: `claude-team launch akira --task "design the battles API" --worktree session/1-akira-battles`.
 
-**Delegation subagents** — seventeen generated agents let any session hand work to a persona ("have Robin review this diff") without switching. Regenerate from profiles with `claude-team sync`.
+**Delegation subagents** — one generated agent per persona lets any session hand work to a specialist ("have Robin review this diff") without switching. Regenerate from profiles with `claude-team sync`.
 
 **Worktree-isolated `/parallel`** — session plans create a git worktree per session and never switch branches; the coordination session merges in dependency order.
 

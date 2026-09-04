@@ -69,7 +69,7 @@ The suite runs on Linux and macOS. macOS ships Bash 3.2 and every entry point en
 
 **No emdashes in prose.** Restructure with commas, colons, semicolons, parentheses, or separate sentences. Emdashes are fine as delimiters in structured lists, such as the `# Name — Role` title or a glossary entry.
 
-**The six coding personas follow [WRITING.md](WRITING.md).** Akira, Sasha, Robin, Alex, Morgan, and Jordan carry a plain technical English standard adapted from the plain-language principles of ASD-STE100. If you are editing one of those profiles, read that file first. The other eleven personas are deliberately exempt, because a word-count rule would strip the craft out of narrative and marketing work.
+**The six coding personas follow [WRITING.md](WRITING.md).** Akira, Sasha, Robin, Alex, Morgan, and Jordan carry a plain technical English standard adapted from the plain-language principles of ASD-STE100. If you are editing one of those profiles, read that file first. The other personas are deliberately exempt, because a word-count rule would strip the craft out of narrative and marketing work.
 
 ## Changing the CLI
 
