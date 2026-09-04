@@ -5,6 +5,47 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-09-04] Noon closes the cyberpunk lane, and the advisor-author pattern is complete
+
+**Category:** `milestone`
+**Tags:** `personas`, `noon`, `nightgrid`, `narrative`, `lane-discipline`, `naming`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+Travolta was scoped to fantasy the way Ernie is scoped to WW2, which left NIGHTGRID's prose unowned. Noon takes it as Cyberpunk Narrative Author. Every game project now has an advisor who verifies and an author who writes. Roster is twenty-one. `tests/run.sh` 296/296.
+
+### Detail
+
+**The pattern is now closed rather than extended.** Cornelius verifies and Ernie writes for the WW2 LCG; Tracy verifies and Travolta writes for d20Mob; Rez verifies and Noon writes for NIGHTGRID. Three projects, three pairs, each pair joined by a hard routing rule in both directions.
+
+**The scope came from the design doc, not from inference.** The NIGHTGRID Opportunity Analysis v1.1 names authored prose as a shipping subsystem in five places: persona voice packs (4.3, explicitly "content, not code: cheap to author, safe to ship weekly, and the natural unit of seasonal content"), the Raid Log (4.2, the daily-ritual hook graded native A), the Operator voice (4.6), District fiction (2), and Vault artifacts whose puzzles turn on reading a leaked log and forging a credential (4.4).
+
+**Two constraints in this seat exist nowhere else on the roster.** First, register is an input rather than a polish: 4.3 requires that "a Breaker's persona narrates a raid differently than a Ghost's, and the same persona shifts register with the situation", so the same event is written several times in different voices. Second, the prose does UX work: 4.6 states that "a 20-second build must feel like a montage, not a spinner", and names the narrative voice as the thing doing it. Copy written for a wait is written to the length of that wait. Neither Ernie nor Travolta faces either constraint, which is most of the argument for a separate profile.
+
+**One behavior is shared verbatim, and two are genre-specific.** `The Screen Budget` is byte-identical to Travolta's, because it encodes a medium constraint rather than a genre one and both authors write to the same kind of surface. This follows the Rez and Tracy precedent, where an identical Homage Meter lets two advisors grade on one scale. The other two are pointed at cyberpunk's own failure modes: `Drop the Gloss` enforces the genre's founding technique of naming a thing and letting context carry it, and cuts sentences that exist only to explain a term the text already explained. `Strip the Neon` finds the line's most generic piece of genre furniture, rain and chrome and mirrorshades, and replaces it with something only this district could produce. It is the sentence-level cousin of Rez's Homage Meter, which operates on concepts.
+
+**The name required an edit to Rez.** Noon is Jeff Noon, author of Vurt, and unlike Tracy and Travolta that lineage was not already on the roster: `profiles/rez.md` listed the New Wave roots, the Movement core, and post-cyberpunk, but no stylists tier. Rez's literature bullet now carries one, so the two personas agree about what the genre contains. Rez's routing bullet also gains Noon, closing the loop the way Tracy's names Travolta.
+
+**Placement and counts followed the established path.** The `TEAM.md` section went before the Game Development Team H2 rather than being appended, `profiles/tiers.conf` went inside the Opus 4.8 block, and only `gtm.md` needed a count edit because the structural docs are count-free.
+
+### Decisions Made
+
+- **Made this a separate seat rather than widening Travolta.** Travolta's hard rules are pointed at decoration, which is fantasy's failure mode. Cyberpunk's are retro pastiche and self-explaining technobabble, which need opposite instincts: fantasy prose is fixed by cutting, cyberpunk prose by withholding. One profile carrying both would have contradicted itself.
+- **Shared `The Screen Budget` verbatim instead of renaming it.** Two prose authors with the same behavior text is not duplication when the behavior encodes a shared constraint. Renaming it per persona would have implied a difference that does not exist.
+- **Extended Rez's canon list rather than picking a name already in it.** Three of the four shortlisted names (Cadigan, Doctorow, Delany) were already in Rez's literature bullet and would have needed no edit. The maintainer chose the one that did, and adding a stylists tier is a genuine improvement to Rez's coverage rather than a cost of the naming choice.
+- **Declared the pattern complete.** There is no fourth project, so no fourth pair is proposed. Recording this so the pattern is not extended reflexively.
+
+### Related
+
+- [2026-09-04] Travolta writes the prose Tracy refuses to — the entry that recorded this gap
+- [2026-09-04] Tracy joins as the fantasy counterpart to Rez — where the advisor half of this pair was built
+- [2026-07-27] Game Development Team: four new personas — the Cornelius and Ernie pairing this generalizes
+
+---
+
 ## [2026-09-04] Travolta writes the prose Tracy refuses to, and the fantasy lane closes
 
 **Category:** `milestone`

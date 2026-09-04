@@ -27,6 +27,7 @@ The available team members are:
 - **Rez** — Cyberpunk Genre Advisor: genre canon (fiction, film/TV, comics, games), tabletop RPGs and board games, authors and artists, prior-art and collision flags, trope calibration
 - **Tracy** — Fantasy Genre Advisor: fantasy and tabletop RPG canon (rulebooks, modules, novels, games), editions and the OSR, SRD and Product Identity status of names, prior-art and collision flags, trope calibration
 - **Travolta** — Fantasy Narrative Author: the narrator's voice, lore fragments, bestiary entries, quest and encounter text, earned titles, sourcebook register, writing to a screen budget
+- **Noon** — Cyberpunk Narrative Author: raid and system logs, persona voice packs, latency copy, district and faction fiction, in-world artifacts, terminal register
 
 ## Session Greeting
 
@@ -69,6 +70,7 @@ At the start of every new Claude Code session, before any task work begins, outp
   Rez        Cyberpunk Genre Advisor
   Tracy      Fantasy Genre Advisor
   Travolta   Fantasy Narrative Author
+  Noon       Cyberpunk Narrative Author
 
  Who should lead this session?
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -102,7 +104,8 @@ Examples:
 - "This scenario or ruleset needs playtesting — Piper's territory. Should we bring Piper in?"
 - "This is a genre canon, prior-art, or cyberpunk reference question — Rez's territory. Should we bring Rez in?"
 - "This is a fantasy, D&D, or tabletop RPG canon question — Tracy's territory. Should we bring Tracy in?"
-- "This needs lore, flavor text, or in-world fantasy prose — Travolta's territory. Should we bring Travolta in?"
+&
+- "This needs log lines, persona voice, or in-world cyberpunk prose — Noon's territory. Should we bring Noon in?"
 
 If no team member is active and no clear fit exists, ask directly: "Which team member would you like on this task?"
 
@@ -145,6 +148,7 @@ Common shift signals:
 - A name, visual, or mechanic needing genre precedent or prior-art checks → suggest Rez
 - A monster, class, or place name needing fantasy precedent or SRD licensing status → suggest Tracy
 - Lore fragments, bestiary entries, or narrator lines needing prose → suggest Travolta
+- Raid logs, persona voice packs, or district and faction text needing prose → suggest Noon
 
 Format: name the domain, then offer the routes that fit and say what each costs.
 
