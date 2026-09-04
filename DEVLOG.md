@@ -5,6 +5,47 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-09-04] Travolta writes the prose Tracy refuses to, and the fantasy lane closes
+
+**Category:** `milestone`
+**Tags:** `personas`, `travolta`, `d20mob`, `narrative`, `naming`, `lane-discipline`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+The Tracy entry recorded an unowned seat: nobody on the roster wrote fantasy prose. Travolta takes it as Fantasy Narrative Author, the Ernie analogue for fantasy. Roster is twenty. `tests/run.sh` 296/296.
+
+### Detail
+
+**The gap was specific, not theoretical.** The d20Mob Engagement Analysis names five shipping content surfaces with no author: DM Dialogue (the narrator line that fires on a streak or a first kill), lore encounters at 15% of the encounter mix, lore fragments gating Boss Discovery, the tiered bestiary reveal across Identified, Studied and Mastered, and earned titles. The Brand Identity Guide fixes the register at "authoritative but inviting, like a well-written sourcebook", explicitly not corporate and not casual-mobile.
+
+**Every adjacent lane was already closed, in writing.** Ernie is the WW2 Narrative Author and his standards rest on historical verification against Cornelius, which has no fantasy equivalent. Toni owns positioning, and Ernie's own profile routes marketing away with "card copy is not ad copy". Iris says it outright: "you do not decide what the brand should say, only what it should look like." Tracy adjudicates canon and writes nothing. Reiner decides whether a mechanic earns its place, not how it reads. That left the seat genuinely empty rather than merely unassigned.
+
+**The behaviors are Ernie's, retuned for a different failure mode.** Ernie's *Sensory Ground Truth* and *Fact then Meaning* both exist to stop invention, because his genre punishes getting it wrong. Fantasy punishes getting it ornate. So Travolta carries *The Screen Budget* (state the surface and its cap before drafting; a line that overflows is unfinished rather than long), *Read It Aloud* (the mouth catches what the eye forgives, and fantasy invites a cadence that scans silently and stumbles spoken), and *Kill the Adjective*, which is Ernie's *Kill Your Darlings* pointed at decoration rather than at overreach.
+
+**One lane rule is unusually hard.** Travolta may not invent a creature, place, spell, or item name without routing it to Tracy first, and prose that ships an unlicensed name is defined as a bug in the prose. That is the reciprocal of the seat Tracy already holds, and Tracy's routing bullet now names Travolta in return, so the loop closes both ways the way Cornelius and Ernie's does.
+
+**The name breaks convention on purpose.** Every other persona encodes its lineage in a luminary's forename: Reiner is Knizia, Cornelius is Ryan, Ernie is Pyle, Tracy is Hickman. Travolta is a surname with no fantasy connection. It comes from a typo in the request that started this work ("Salvatore travolta"), the maintainer chose to keep it, and nothing in the tooling cares: `bin/claude-team` and `generate-agents.sh` split the title on its em dash and never parse the name, and eight characters fits the coordinator greeting table's ten-wide name field.
+
+**Placement followed the Rez precedent rather than the Ernie one.** Travolta is an Ernie analogue and Ernie sits in the Game Development Team, but that section's argument is built on a closed, interlocking set of four for a WW2 studio. Widening it to five would weaken a deliberately constructed argument, which is the same call made when Rez landed. Travolta sits in the main roster after Tracy, and the README's studio-adjacency note now covers all three outsiders.
+
+### Decisions Made
+
+- **Made this a separate seat rather than widening Ernie.** Ernie's craft transfers; his standards do not, since they are built on a verification relationship with Cornelius that fantasy has no equivalent for. Widening him would have produced a persona whose hard rules applied to half its own domain.
+- **Kept the maintainer's name over the convention.** Travolta was flagged as a departure that loses the lineage signal, with Salvatore offered as the one-word swap that would keep it. The maintainer chose Travolta. Recorded here so a future reader finds a decision rather than an inconsistency.
+- **Wrote the name-routing rule as a prose defect, not a courtesy.** "Prose that ships an unlicensed name is a bug in the prose" puts the obligation on the writer rather than on a reviewer downstream. This is the mechanism that makes the Tracy pairing load-bearing instead of advisory.
+- **Marked the Tracy proposal's section 6 resolved in place rather than deleting it.** The reasoning for why the seat was deferred is worth keeping; only its status changed.
+
+### Related
+
+- `docs/proposals/d20mob-genre-advisor.md` section 6, now marked resolved
+- [2026-09-04] Tracy joins as the fantasy counterpart to Rez — the entry that recorded this gap
+- [2026-07-27] Game Development Team: four new personas — the Ernie profile this is built on
+
+---
+
 ## [2026-09-04] Tracy joins as the fantasy counterpart to Rez, and Reiner absorbs the d20 lane
 
 **Category:** `milestone`

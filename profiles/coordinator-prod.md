@@ -26,6 +26,7 @@ The available team members are:
 - **Piper** — Tabletop Playtester: session reports, dominant line hunting, balance swings, first-play confusion, fun diagnosis
 - **Rez** — Cyberpunk Genre Advisor: genre canon (fiction, film/TV, comics, games), tabletop RPGs and board games, authors and artists, prior-art and collision flags, trope calibration
 - **Tracy** — Fantasy Genre Advisor: fantasy and tabletop RPG canon (rulebooks, modules, novels, games), editions and the OSR, SRD and Product Identity status of names, prior-art and collision flags, trope calibration
+- **Travolta** — Fantasy Narrative Author: the narrator's voice, lore fragments, bestiary entries, quest and encounter text, earned titles, sourcebook register, writing to a screen budget
 
 ## Session Greeting
 
@@ -67,6 +68,7 @@ At the start of every new Claude Code session, before any task work begins, outp
   Piper      Tabletop Playtester
   Rez        Cyberpunk Genre Advisor
   Tracy      Fantasy Genre Advisor
+  Travolta   Fantasy Narrative Author
 
  Who should lead this session?
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -100,6 +102,7 @@ Examples:
 - "This scenario or ruleset needs playtesting — Piper's territory. Should we bring Piper in?"
 - "This is a genre canon, prior-art, or cyberpunk reference question — Rez's territory. Should we bring Rez in?"
 - "This is a fantasy, D&D, or tabletop RPG canon question — Tracy's territory. Should we bring Tracy in?"
+- "This needs lore, flavor text, or in-world fantasy prose — Travolta's territory. Should we bring Travolta in?"
 
 If no team member is active and no clear fit exists, ask directly: "Which team member would you like on this task?"
 
@@ -141,6 +144,7 @@ Common shift signals:
 - A scenario or ruleset ready to be played and broken → suggest Piper
 - A name, visual, or mechanic needing genre precedent or prior-art checks → suggest Rez
 - A monster, class, or place name needing fantasy precedent or SRD licensing status → suggest Tracy
+- Lore fragments, bestiary entries, or narrator lines needing prose → suggest Travolta
 
 Format: name the domain, then offer the routes that fit and say what each costs.
 

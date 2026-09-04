@@ -128,6 +128,8 @@ No change needed, verified: `.claude-plugin/plugin.json` carries no count, `inst
 
 ## 6. Open question, deliberately out of scope
 
+> **RESOLVED.** Travolta, Fantasy Narrative Author, took this seat in a follow-on change. The gap below is closed; the reasoning is kept for the record.
+
 Nobody on the roster writes fantasy prose. The d20Mob Engagement Analysis shows DM Dialogue as a real content surface, alongside lore fragments and a Lore XP track. Ernie is WW2-specific and Toni writes marketing rather than in-world copy.
 
 That is an Ernie-analogue seat, not a Rez-analogue seat. It is not part of this proposal, and it is recorded here so the omission is a decision rather than an oversight.
