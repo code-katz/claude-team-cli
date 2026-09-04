@@ -5,6 +5,87 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-09-04] Rez lands as persona eighteen, and every surface a persona touches
+
+**Category:** `milestone`
+**Tags:** `personas`, `rez`, `doc-drift`, `generated-artifacts`, `naming`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+Rez had been running in the owner's local install since 2026-09-01 but was never pushed, so the repo carried seventeen personas while installed teams had eighteen. Landing the profile exposed four consistency defects that the persona-parity tests do not cover, all of them in the surfaces a new persona touches rather than in the profile itself.
+
+### Detail
+
+**The profile was already structurally sound.** Akira compared Rez against the other seventeen across twelve canonical heading slots and found the heading set, heading order, and body shape matched the Cornelius, Ernie, Piper, and Reiner cluster exactly: three personality paragraphs, seven domain bullets, five standards bullets, six communication bullets, three interactive behaviors. Regenerating from the committed profile reproduced the committed `agents/rez.md` and `commands/rez.md` byte for byte. The two headings Rez lacks, `First Principle` and `Plain Technical English`, belong to the six engineering personas by design. No structural repair was needed.
+
+**What did break was placement.** `TEAM.md` has exactly two H2 sections, and appending the new persona section to the end of the file filed Rez under `## The Game Development Team`, whose intro names a closed set of four and never mentions Rez. Meanwhile `README.md` listed Rez in the main roster. The two roster documents disagreed about which team Rez was on. `profiles/tiers.conf` had the same shape of defect: seventeen of eighteen entries sit inside their tier's contiguous block, and Rez was appended after the Sonnet 5 block despite being an Opus 4.8 persona.
+
+**The role name was a topic, not a job.** The README Role column reads as a job title for every other persona (Product Manager, Business Advisor, Data Analyst), and "Cyberpunk Pop Culture" named a subject area instead. Toni caught it. The fix could not be a README-only edit, because that column tracks the profile title with the role suffix trimmed, so changing one cell would have left the README disagreeing with the profile, both coordinators, `TEAM.md`, and both generated files. Renamed to **Cyberpunk Genre Advisor** across all seven surfaces.
+
+**Two edits to the ported profile.** The Handoff Brief example named `DARKFIBER`, which came from a downstream project's naming work and should not ship in a public repo. It is now `BACKHAUL`. The replacement had to be a genuine telecom-commons term rather than an invented word, because the example's own logic turns on the name being commons rather than an author coinage. Separately, the three Required Interactive Behaviors described what to output but never scripted the phrasing, so they now carry verbatim italic lines in the same construction as `profiles/sage.md` behavior #3.
+
+**A generator behavior worth knowing.** `commands/rez.md` does not contain the Required Interactive Behaviors section, and that is correct rather than a miss: the generator strips that section from all eighteen command files while keeping it in all eighteen agent files.
+
+### Decisions Made
+
+- **Renamed the role everywhere rather than only in the README.** A README-only change was the literal proposal, and it would have introduced a persona whose name differed between the roster and its own profile. Rejected in favor of the seven-surface rename, at the cost of the profile title no longer matching the local install verbatim.
+- **Kept the profile's opening sentence describing Rez as "the team's cyberpunk pop culture expert".** It is descriptive prose rather than a title, and rewriting it around the new role name produces "the team's cyberpunk genre advisor, an embedded genre advisor for game and brand development", which reads worse than the inconsistency.
+- **Authored the missing spoken lines rather than leaving the gap.** This is content that does not exist in the local install, so it was deliberately left alone during the port and added only after the maintainer approved specific wording. The lines are short on purpose: Rez's stated style is "verdicts short and evidence long", so a long scripted line would contradict the persona.
+- **Moved the `TEAM.md` section rather than rewriting the game studio intro to admit a fifth member.** That section's argument is built on a closed, interlocking set of four, and widening it to five would weaken a deliberately constructed argument to fix a filing error.
+
+### Related
+
+- PR #33, merge commit `9f5a14d`, eight commits, `tests/run.sh` 296/296 throughout
+- [2026-09-04] Roster counts removed from the docs, and deliberately not tested — the count-free work this port occasioned
+- [2026-07-28] Design lane split: honest image backends, a visual QA loop, and Iris as persona #17 — the previous persona addition
+
+---
+
+## [2026-09-04] Roster counts removed from the docs, and deliberately not tested
+
+**Category:** `infrastructure`
+**Tags:** `doc-drift`, `positioning`, `testing`, `gtm`, `maintenance`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+Adding the eighteenth persona broke a stated roster count in nine places in `README.md` alone, and the sweep that fixed it was case sensitive, so the tagline still read "Seventeen specialists" while its own verification step reported clean. Rather than correct the numbers and schedule the same failure for persona nineteen, the docs stopped stating a count. No test enforces this, on purpose.
+
+### Detail
+
+**How the breakage hid.** The fix instruction was to replace `seventeen` with `eighteen` and confirm with `grep -c seventeen README.md`. Both the replacement and the verification were case sensitive, so capitalized instances were invisible to both: the check returned 0 while line 11, the first line a reader sees, still said "Seventeen specialists". Two further instances read "the other eleven personas", a count derived as eighteen total minus the six coding personas, which matches no search for a roster number at all. `gtm.md` had been advertising a seventeen-person team since before Rez existed, in eight locations including the LinkedIn drafts.
+
+**The scale of the maintenance.** Nine occurrences in `README.md` (six lowercase, one capitalized in the tagline, two as numerals in the project tree), two in `TEAM.md`, one in `CONTRIBUTING.md`, and eight in `gtm.md`. One tagline line was the root of five of them, because it is duplicated into `gtm.md` positioning and paraphrased into social copy.
+
+**What replaced them.** Copy now describes the generation rule instead of a snapshot: "one command per persona", "one file per specialist", "full profiles for the whole roster". Three separate circumlocutions were collapsed onto the single noun "roster", which the page already introduces and which `claude-team list` returns.
+
+**`gtm.md` got split treatment,** because it is two documents. Its positioning layer is what people copy from, so a stale number there propagates, and it went count-free. Its drafted social copy keeps numbers, because specificity is the hook in a post opener and a published post is never edited afterwards; those figures were corrected to eighteen and a pre-flight note now states that draft figures are snapshots to re-check against `claude-team list` before publishing.
+
+**Numbers that survived, because they carry an argument rather than a spec:** "a four-person studio", whose next sentence enumerates all four and their lanes; "10 workflow commands", which does not scale with personas and is the only place a reader learns `commands/` holds two kinds of thing; and the ASD-STE100 writing-rule counts in `README.md` and `TEAM.md`, which count rules, not personas, and which a mechanical sweep would have corrupted.
+
+**Why no test.** A regression guard was drafted and then abandoned. Three objections killed it. It would reject true statements: a maintainer who adds persona nineteen and writes "Nineteen specialists" has written a correct sentence, and a rule that reddens CI over it is enforcing a style preference about facts that might rot, not catching a defect. It required an allowlist for "Fourteen rules", "fourteen-rule standard", "four-person studio", "10 workflow commands" and "the coding six", and a rule needing that much special-case knowledge to avoid firing on correct prose is the wrong tool. And the premise did not survive scrutiny: the maintainer does not care how many personas there are, which means the original defect was never staleness but that the docs asserted a number nobody needed. Removing the assertion removes the failure mode outright rather than mitigating it.
+
+### Decisions Made
+
+- **Removed the counts instead of correcting them.** Correcting them was the cheaper option and was explicitly offered. Rejected because it fixes today's instance and guarantees a repeat on the next persona, through a detection path already proven blind to capitalization and to derived counts.
+- **Dropped the tagline's number, at a real cost.** "Eighteen specialists, one CLI, zero meetings" had a descending numeric cadence that "Named specialists" loses. Taken anyway, on Toni's argument that no buyer has a threshold at eighteen, that a roster count frames the category as a size race that any repository of prompts wins trivially, and that this single line is why one stale number propagated into five places.
+- **Wrote no regression guard, and this is a decision rather than an omission.** Akira reported the missing coverage as a fact and explicitly declined to recommend a test, saying it was a maintainer decision and not a requirement the current tree imposes. This extends two existing precedents: Robin declined a README/ROADMAP byte-sync test on 2026-07-31 because it would enforce agreement rather than truth, and the banned-claim check on the same date deliberately strips quoted spans rather than maintaining a file exclusion list. An allowlist-bearing count lint would have violated both.
+- **Left `ROADMAP.md` alone.** Its "[x] Seventeen delegation subagents" is a checked milestone recording what v2.0 shipped. Editing completed-milestone text to match present state converts a changelog into a status page and destroys the record of what that release contained. A count-free rewrite exists and was rejected outside an explicit no-counts-anywhere policy, which is not the policy adopted here.
+- **Excluded `gtm.md` social drafts from the count-free rule,** so this is deliberately not a repo-wide prohibition. The property being protected is "structural docs do not assert a roster size", not "no number appears near the word persona".
+
+### Related
+
+- PR #33, merge commit `9f5a14d`
+- [2026-09-04] Rez lands as persona eighteen — the addition that exposed the counts
+- [2026-07-31] Five review rounds, five different lists: replacing doc review with doc assertions — the precedent for declining a test that enforces agreement rather than truth
+
+---
+
 ## [2026-07-31] Marketplace publishing retired, not deferred
 
 **Category:** `strategy`
