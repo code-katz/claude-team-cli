@@ -5,6 +5,50 @@ Auto-maintained via Claude devlog skill. Entries are reverse-chronological.
 
 ---
 
+## [2026-09-04] Tracy joins as the fantasy counterpart to Rez, and Reiner absorbs the d20 lane
+
+**Category:** `milestone`
+**Tags:** `personas`, `tracy`, `reiner`, `d20mob`, `genre-advisors`, `licensing`
+
+**Risk Level:** `low`
+**Breaking Change:** `no`
+
+### Summary
+
+Rez gave NIGHTGRID a genre-authority seat. d20Mob had none, and it carries licensing exposure no persona owned. Tracy lands as Fantasy Genre Advisor, built section for section on the Rez template, and Reiner is deepened with d20 RPG systems expertise instead of a third persona being created. Roster is nineteen. `tests/run.sh` 296/296.
+
+### Detail
+
+**The pattern being extended, not invented.** Every game project in this repo gets a domain-authority seat that verifies rather than produces: Cornelius verifies historical fact for the WW2 LCG, Rez verifies genre precedent for NIGHTGRID. d20Mob had the gap. Tracy fills the same slot, sits in the main roster rather than the Game Development Team for the same reason Rez does, and holds the same lane discipline: advises on precedent and the licensing status of names, and routes mechanics to Reiner, positioning to Toni, art to Iris and Kai, table validation to Piper, and legal process to Sage.
+
+**Why fantasy needed the seat more than cyberpunk did.** The d20Mob Brand Identity Guide already mandates SRD 5.1 CC-BY attribution and the Mechanics Analysis confirms the licensing posture holds, but neither addresses which names the SRD actually contains. The Phase 1 bestiary is clean: Ghoul, Troll, Kobold, Wraith and Dire Wolf are all SRD content. The marquee creatures players ask for by name are Product Identity and never entered any SRD. That is a live trap for a bestiary that grows, and it fires at illustration-commission time rather than at review time.
+
+**One heading differs from the template, deliberately.** Rez carries `## Provenance Standards`. Tracy carries `## Provenance and Licensing Standards`, and the Status column in the Provenance Check behavior is retuned from Rez's coinage-versus-commons axis to SRD content, Product Identity, OGL third-party, genre commons, and author coinage. Everything else matches Rez slot for slot and count for count: three personality paragraphs, seven domain bullets, five How You Operate questions, five standards bullets, six communication bullets, three interactive behaviors.
+
+**The Homage Meter was deliberately left identical.** Same four notches as Rez (lift, pastiche, homage, fresh twist), same scripted line construction. Two genre advisors that grade on one scale produce comparable verdicts; diverging the scale would have bought nothing and cost the comparison.
+
+**Reiner took additive edits only.** The first domain bullet widens to admit roleplaying games, two RPG-systems bullets are added, and the lane paragraph gains the Tracy boundary. The `# Reiner — Tabletop Game Designer` title is untouched: `bin/claude-team` `get_active`, `cmd_list`, and `scripts/generate-agents.sh` all split on that delimiter, and a role rename would have rippled through six files to no functional end.
+
+**The two placement defects the Rez port exposed were avoided rather than repeated.** `TEAM.md` has exactly two H2 sections, so Tracy's section was inserted before `## The Game Development Team` rather than appended, which would have filed a main-roster persona under a studio whose intro names a closed set of four. `profiles/tiers.conf` groups entries by tier in contiguous blocks, so `tracy` went inside the Opus 4.8 block after `rez` rather than at the end of the file.
+
+**Counts.** `gtm.md` drafted-post figures moved from eighteen to nineteen, which is what that file's own pre-flight note asks for: those are point-in-time snapshots to re-check against `claude-team list` before publishing. No other count moved, because `README.md`, `TEAM.md`, and `CONTRIBUTING.md` went count-free in the previous entry, and `ROADMAP.md` records what v2.0 shipped.
+
+### Decisions Made
+
+- **Deepened Reiner rather than adding a d20 rules designer.** A rules specialist would have overlapped Reiner's decision-space and complexity-budget lane heavily. This follows the Casey precedent from 2026-03: deepen the persona who already holds the ground rather than creating overlap. The cost is that Reiner's title now understates his range, accepted because the alternative was a six-file rename.
+- **Named Tracy after a genre luminary's first name, matching the studio convention.** Reiner is Knizia, Cornelius is Ryan, Ernie is Pyle. Tracy is Hickman, and is gender neutral in the same way River, Sage, Quinn, and Morgan are. The persona is an original character who shares a first name, not a portrayal of the author.
+- **Made the role name a job title, not a topic.** "Fantasy Genre Advisor" rather than anything naming a subject area. This applies the correction the Rez port already had to make once, before it could recur.
+- **Scoped Tracy to advisory only, and recorded the gap that leaves.** Nobody on the roster writes fantasy prose. d20Mob's Engagement Analysis shows DM Dialogue, lore fragments, and a Lore XP track as real content surfaces; Ernie is WW2-specific and Toni writes marketing rather than in-world copy. That is an Ernie-analogue seat, not a Rez-analogue seat, and folding both into Tracy would have broken the lane discipline the repo enforces everywhere else. Left out on purpose and documented in the proposal.
+
+### Related
+
+- `docs/proposals/d20mob-genre-advisor.md`, the proposal this entry implements
+- [2026-09-04] Rez lands as persona eighteen, and every surface a persona touches — the template and the two placement defects this addition avoided
+- [2026-09-04] Roster counts removed from the docs, and deliberately not tested — why only `gtm.md` needed a count edit
+- [2026-07-27] Game Development Team: four new personas, model re-tiering, no-emdash house style — the Reiner profile this deepens
+
+---
+
 ## [2026-09-04] Rez lands as persona eighteen, and every surface a persona touches
 
 **Category:** `milestone`
