@@ -22,7 +22,7 @@ That's what this is.
 
 `claude-team-cli` gives you a crew of named, specialized Claude personas, each one a formal expert consultant with deep domain knowledge, a distinct way of thinking, and enterprise-grade security instincts baked in. You pick who's on the task, and Claude shows up as that person.
 
-Need to define requirements? Call River. Design an API? Akira. Building a component that has to be accessible and secure? That's Sasha's world. Need a mockup before anyone writes code? Kai will have a device-frame HTML wireframe in your browser before the discussion goes abstract. Data pipelines or ML ops? Jordan. Dashboards and metrics? Casey. Security review or threat model? Morgan. Designing your deployment pipeline? Alex. Writing tests? Robin's got it. Planning a launch? Toni. Making sure everything actually ships on time? Quinn. Figuring out how to form your company, manage finances, or avoid legal landmines? That's Sage. Need a logo, an icon set, or marketing art? Iris. Building a tabletop game? Reiner designs the mechanics, Cornelius keeps the history honest, Ernie writes the flavor, and Piper plays it until it breaks. Building inside a genre? Rez tells you what has already been done with that name, that trope, and that look, and whether the reference you want is free to take. Building fantasy? Tracy does the same for fifty years of dungeons, and knows which monster names the SRD actually lets you ship.
+Need to define requirements? Call River. Design an API? Akira. Building a component that has to be accessible and secure? That's Sasha's world. Need a mockup before anyone writes code? Kai will have a device-frame HTML wireframe in your browser before the discussion goes abstract. Data pipelines or ML ops? Jordan. Dashboards and metrics? Casey. Security review or threat model? Morgan. Designing your deployment pipeline? Alex. Writing tests? Robin's got it. Planning a launch? Toni. Making sure everything actually ships on time? Quinn. Figuring out how to form your company, manage finances, or avoid legal landmines? That's Sage. Need a logo, an icon set, or marketing art? Iris. Building a tabletop game? Reiner designs the mechanics, Cornelius keeps the history honest, Ernie writes the flavor, and Piper plays it until it breaks. Building inside a genre? Rez tells you what has already been done with that name, that trope, and that look, and whether the reference you want is free to take. Building fantasy? Tracy does the same for fifty years of dungeons, and knows which monster names the SRD actually lets you ship. And when the lore itself needs writing, Travolta writes it: the narrator's voice, the bestiary entries, the line that fires on a seven-day streak.
 
 ### How it works in practice
 
@@ -99,6 +99,7 @@ Specialists for building and shipping a product, and a studio below for tabletop
 | Iris | Brand & Illustration | Logos, icon sets, illustration, marketing graphics, asset licensing |
 | Rez | Cyberpunk Genre Advisor | Genre precedent, name and term collisions, homage versus cliché, what to read or watch |
 | Tracy | Fantasy Genre Advisor | Fantasy and D&D canon, SRD versus Product Identity, monster and class name status, what to read or run |
+| Travolta | Fantasy Narrative Author | Lore fragments, bestiary entries, narrator lines, earned titles, sourcebook voice |
 
 Full profiles for the whole roster are in [TEAM.md](TEAM.md).
 
@@ -113,7 +114,7 @@ A four-person studio for card and board game projects. The four hold their lanes
 | Ernie | WW2 Narrative Author | Flavor text, mission briefings, card copy, historical prose |
 | Piper | Tabletop Playtester | Session reports, dominant lines, balance swings, first-play confusion |
 
-Rez and Tracy sit in the roster above rather than in this studio, and work alongside it. For a game set inside a genre rather than a period, they check what the genre has already done with that name, that mechanic, or that look before Reiner commits to it: Rez for cyberpunk, Tracy for fantasy and the d20 tradition.
+Rez, Tracy and Travolta sit in the roster above rather than in this studio, and work alongside it. For a game set inside a genre rather than a period, Rez and Tracy check what the genre has already done with that name, that mechanic, or that look before Reiner commits to it: Rez for cyberpunk, Tracy for fantasy and the d20 tradition. Travolta then writes the fantasy prose, standing to Tracy as Ernie stands to Cornelius.
 
 ---
 

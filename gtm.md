@@ -382,7 +382,7 @@ Robin: Before I sketch the strategy, I need to
 That's not a checklist. That's a senior QA engineer
 reframing the problem before touching a test file.
 
-Robin is one of nineteen. Two-minute install. Open source.
+Robin is one of twenty. Two-minute install. Open source.
 
 What domain do you wish you had a specialist for?
 
@@ -434,7 +434,7 @@ What would you automate first?
 ```
 Repos:
 
-Team CLI (19 specialist personas):
+Team CLI (20 specialist personas):
 github.com/code-katz/claude-team-cli
 
 Companion skills:
